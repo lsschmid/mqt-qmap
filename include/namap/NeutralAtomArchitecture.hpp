@@ -5,12 +5,16 @@
 #pragma once
 
 #include "ShuttlingOperation.hpp"
+#include "utils.hpp"
 
 #include <cstdint>
 #include <map>
 #include <string>
 #include <utility>
 #include <vector>
+
+using SwapDistances = std::vector<std::vector<std::uint32_t>>;
+using CoordIndex    = std::uint32_t;
 
 namespace qc {
 class NeutralAtomArchitecture {
@@ -28,9 +32,25 @@ class NeutralAtomArchitecture {
     [[nodiscard]] inline std::pair<std::uint32_t, std::uint32_t> getXY() const {
       return std::make_pair(x, y);
     }
-    [[nodiscard]] inline fp getDistance(const Coordinate& c) const {
+    [[nodiscard]] inline fp getEuclidianDistance(const Coordinate& c) const {
       return std::sqrt(std::pow(static_cast<fp>(x) - static_cast<fp>(c.x), 2) +
                        std::pow(static_cast<fp>(y) - static_cast<fp>(c.y), 2));
+    }
+    [[nodiscard]] inline uint32_t
+    getManhattenDistanceX(const Coordinate& c) const {
+      if (x > c.x) {
+        return x - c.x;
+      } else {
+        return c.x - x;
+      }
+    }
+    [[nodiscard]] inline uint32_t
+    getManhattenDistanceY(const Coordinate& c) const {
+      if (y > c.y) {
+        return y - c.y;
+      } else {
+        return c.y - y;
+      }
     }
   };
 
@@ -41,14 +61,19 @@ class NeutralAtomArchitecture {
     std::uint16_t nAods;
     std::uint16_t nAodCoordinates;
     fp            interQubitDistance;
+    fp            interactionRadius;
+    fp            blockingFactor;
 
   public:
     Properties() = default;
     Properties(std::uint16_t nRows, std::uint16_t nColumns, std::uint16_t nAods,
-               std::uint16_t nAodCoordinates, fp interQubitDistance)
+               std::uint16_t nAodCoordinates, fp interQubitDistance,
+               fp interactionRadius, fp blockingFactor)
         : nRows(nRows), nColumns(nColumns), nAods(nAods),
           nAodCoordinates(nAodCoordinates),
-          interQubitDistance(interQubitDistance) {}
+          interQubitDistance(interQubitDistance),
+          interactionRadius(interactionRadius), blockingFactor(blockingFactor) {
+    }
     [[nodiscard]] inline std::uint16_t getNpositions() const {
       return nRows * nColumns;
     }
@@ -61,9 +86,14 @@ class NeutralAtomArchitecture {
     [[nodiscard]] inline fp getInterQubitDistance() const {
       return interQubitDistance;
     }
+    [[nodiscard]] inline fp getInteractionRadius() const {
+      return interactionRadius;
+    }
+    [[nodiscard]] inline fp getBlockingFactor() const { return blockingFactor; }
   };
 
   struct Parameters {
+    std::uint32_t               nQubits;
     std::map<OpType, fp>        gateTimes;
     std::map<OpType, fp>        gateAverageFidelities;
     std::map<ShuttlingType, fp> shuttlingTimes;
@@ -87,8 +117,10 @@ protected:
   Properties              properties{};
   Parameters              parameters;
   std::vector<Coordinate> coordinates;
+  SwapDistances           swapDistances;
 
   void createCoordinates();
+  void computeSwapDistances(fp interactionRadius);
 
 public:
   std::string name;
@@ -116,6 +148,22 @@ public:
     return properties.getInterQubitDistance();
   }
 
+  [[nodiscard]] inline fp getInteractionRadius() const {
+    return properties.getInteractionRadius();
+  }
+  [[nodiscard]] inline fp getBlockingFactor() const {
+    return properties.getBlockingFactor();
+  }
+  [[nodiscard]] inline fp getSwapDistance(std::uint32_t idx1,
+                                          std::uint32_t idx2) const {
+    return swapDistances[idx1][idx2];
+  }
+  [[nodiscard]] inline fp getSwapDistance(const Coordinate& c1,
+                                          const Coordinate& c2) const {
+    return swapDistances[c1.getX() + c1.getY() * properties.getNcolumns()]
+                        [c2.getX() + c2.getY() * properties.getNcolumns()];
+  }
+
   [[nodiscard]] inline fp getGateTime(OpType opType) const {
     return parameters.gateTimes.at(opType);
   }
@@ -140,10 +188,45 @@ public:
     return coordinates[idx];
   }
 
+  [[nodiscard]] inline uint32_t getIndex(const Coordinate& c) {
+    return c.getX() + c.getY() * properties.getNcolumns();
+  }
+
   void loadJson(const std::string& filename);
 
-  [[nodiscard]] fp getDistance(std::uint32_t idx1, std::uint32_t idx2) const;
-  [[nodiscard]] static fp getDistance(const Coordinate& c1,
-                                      const Coordinate& c2);
+  [[nodiscard]] inline fp getEuclidianDistance(std::uint32_t idx1,
+                                               std::uint32_t idx2) const {
+    return this->coordinates.at(idx1).getEuclidianDistance(
+        this->coordinates.at(idx2));
+  }
+  [[nodiscard]] inline static fp getEuclidianDistance(const Coordinate& c1,
+                                                      const Coordinate& c2) {
+    return c1.getEuclidianDistance(c2);
+  }
+  [[nodiscard]] inline uint32_t
+  getManhattenDistanceX(std::uint32_t idx1, std::uint32_t idx2) const {
+    return this->coordinates.at(idx1).getManhattenDistanceX(
+        this->coordinates.at(idx2));
+  }
+  [[nodiscard]] inline uint32_t
+  getManhattenDistanceY(std::uint32_t idx1, std::uint32_t idx2) const {
+    return this->coordinates.at(idx1).getManhattenDistanceY(
+        this->coordinates.at(idx2));
+  }
+  [[nodiscard]] inline uint32_t getManhattenDistanceX(const Coordinate& c1) {
+    return c1.getManhattenDistanceX(c1);
+  }
+  [[nodiscard]] inline uint32_t getManhattenDistanceY(const Coordinate& c1) {
+    return c1.getManhattenDistanceY(c1);
+  }
+
+  [[nodiscard]] inline uint32_t getSwapDistance(std::uint32_t idx1,
+                                                std::uint32_t idx2) {
+    return swapDistances[idx1][idx2];
+  }
+  [[nodiscard]] inline uint32_t getSwapDistance(const Coordinate& c1,
+                                                const Coordinate& c2) {
+    return swapDistances[this->getIndex(c1)][this->getIndex(c2)];
+  }
 };
 } // namespace qc
