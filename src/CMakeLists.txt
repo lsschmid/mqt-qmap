@@ -53,8 +53,16 @@ macro(ADD_NAMAP_LIBRARY libname srcfile)
   set(lib ${PROJECT_NAME}_${libname}_lib)
 
   # main project library
-  add_library(${lib} ${libname}/${srcfile}.cpp
-                     ${PROJECT_SOURCE_DIR}/include/${libname}/${srcfile}.hpp)
+  add_library(
+    ${lib}
+    ${libname}/${srcfile}.cpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/${srcfile}.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/ShuttlingOperation.hpp
+    # ${PROJECT_SOURCE_DIR}/include/${libname}/Scheduler.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomArchitecture.hpp
+    namap/ShuttlingOperation.cpp
+    # namap/Scheduler.cpp
+    namap/NeutralAtomArchitecture.cpp)
 
   add_internal_library(${lib} ${srcfile})
 endmacro()
