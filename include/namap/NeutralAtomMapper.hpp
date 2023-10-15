@@ -4,20 +4,54 @@
 
 #pragma once
 
-#include "Architecture.hpp"
+#include "NeutralAtomMappingResults.hpp"
+#include "QuantumComputation.hpp"
+#include "namap/NeutralAtomArchitecture.hpp"
 
-constexpr std::int16_t DEFAULT_POSITION = -1;
+namespace qc {
+class NeutralAtomMapper {
+protected:
+  using Layer = std::set<std::unique_ptr<qc::Operation>*>;
 
-class test {
-  int a;
+  qc::NeutralAtomArchitecture arch;
+  qc::QuantumComputation      mappedQc;
+  Layer                       frontLayer;
+  DAG                         dag;
+  DAGIterators                dagIterators;
+  //  qc::QuantumComputation      lookaheadLayer;
+  //  std::map<Qubit, Qubit>      circToHwMapping;
+  //  std::map<Qubit, CoordIndex> hwQubitCoordinates;
+  NeutralAtomMappingResults results;
 
-  test(int a) : a(a){};
+  struct Settings {
+    fp a = 0.5;
+  };
 
-  int getA() { return a; };
+  void createFrontLayer();
+  void
+  updateFrontLayerByGate(std::set<std::unique_ptr<Operation>*>& gatesToExecute);
+  void        updateFrontLayerByQubit(std::vector<Qubit>& qubitsToCheck);
+  void        mapGate(std::unique_ptr<qc::Operation>* op);
+  static bool isExecutable(qc::Operation* op);
+  bool        isAtFront(std::unique_ptr<qc::Operation>* opPointer);
 
-  void setA(int _a) { this->a = _a; };
+public:
+  // Getter
+  [[nodiscard]] inline qc::NeutralAtomArchitecture getArchitecture() const {
+    return arch;
+  }
+  [[nodiscard]] inline NeutralAtomMappingResults getResults() const {
+    return results;
+  }
+  [[nodiscard]] inline std::map<uint32_t, uint32_t> getInitialMapping() const {
+    return mappedQc.initialLayout;
+  }
 
-  void printA() { std::cout << a << std::endl; };
+  // Constructors
+  NeutralAtomMapper(const qc::NeutralAtomArchitecture arch) : arch(arch){};
+
+  // Methods
+  void map(qc::QuantumComputation& qc);
 };
 
-int return_1();
+} // namespace qc
