@@ -16,24 +16,41 @@ protected:
   qc::NeutralAtomArchitecture arch;
   qc::QuantumComputation      mappedQc;
   Layer                       frontLayer;
+  std::vector<Qubit>          frontQubitsToUpdate;
+  std::vector<Layer>          frontCandidates;
   DAG                         dag;
-  DAGIterators                dagIterators;
-  //  qc::QuantumComputation      lookaheadLayer;
+  DAGIterators                frontLayerIterators;
+  Layer                       lookaheadLayer;
+  std::vector<uint32_t>       lookaheadOffsets;
+  std::vector<Layer>          lookaheadCandidates;
+  std::vector<Qubit>          lookaheadQubitsToUpdate;
+  uint32_t                    lookaheadDepth = 1;
   //  std::map<Qubit, Qubit>      circToHwMapping;
   //  std::map<Qubit, CoordIndex> hwQubitCoordinates;
   NeutralAtomMappingResults results;
 
-  struct Settings {
-    fp a = 0.5;
-  };
-
   void createFrontLayer();
   void
   updateFrontLayerByGate(std::set<std::unique_ptr<Operation>*>& gatesToExecute);
-  void        updateFrontLayerByQubit(std::vector<Qubit>& qubitsToCheck);
+  void        updateFrontLayerByQubit();
+  void        updateFrontLayerByCandidates();
+  void        findFrontCandidates();
+  void        updateLookaheadLayerByQubit();
+  void        findLookaheadCandidates();
+  void        updateLookaheadLayerByCandidates();
   void        mapGate(std::unique_ptr<qc::Operation>* op);
+  static bool commutesWith(Layer&                          layer,
+                           std::unique_ptr<qc::Operation>* opPointer);
+  static bool commute(std::unique_ptr<qc::Operation>* opPointer1,
+                      std::unique_ptr<qc::Operation>* opPointer2);
+  static bool
+  commuteSingleQubitZAndControl(std::unique_ptr<qc::Operation>* opPointer1,
+                                std::unique_ptr<qc::Operation>* opPointer2);
   static bool isExecutable(qc::Operation* op);
-  bool        isAtFront(std::unique_ptr<qc::Operation>* opPointer);
+  void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
+
+  // temp
+  void printLayers();
 
 public:
   // Getter
