@@ -7,8 +7,10 @@
 #include "NeutralAtomMappingResults.hpp"
 #include "QuantumComputation.hpp"
 #include "namap/NeutralAtomArchitecture.hpp"
+#include "namap/NeutralAtomUtils.hpp"
 
 namespace qc {
+
 class NeutralAtomMapper {
 protected:
   using Layer = std::set<std::unique_ptr<qc::Operation>*>;
@@ -25,10 +27,11 @@ protected:
   std::vector<Layer>          lookaheadCandidates;
   std::vector<Qubit>          lookaheadQubitsToUpdate;
   uint32_t                    lookaheadDepth = 1;
-  //  std::map<Qubit, Qubit>      circToHwMapping;
-  //  std::map<Qubit, CoordIndex> hwQubitCoordinates;
-  NeutralAtomMappingResults results;
+  //  NeutralAtomMappingResults   results;
+  HardwareQubits hardwareQubits;
+  Mapping        mapping;
 
+  // Methods for layer creation
   void createFrontLayer();
   void
   updateFrontLayerByGate(std::set<std::unique_ptr<Operation>*>& gatesToExecute);
@@ -49,6 +52,9 @@ protected:
   static bool isExecutable(qc::Operation* op);
   void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
 
+  // Methods for mapping
+  void initCoordinates(InitialCoordinateMapping initialCoordinateMapping);
+
   // temp
   void printLayers();
 
@@ -57,15 +63,18 @@ public:
   [[nodiscard]] inline qc::NeutralAtomArchitecture getArchitecture() const {
     return arch;
   }
-  [[nodiscard]] inline NeutralAtomMappingResults getResults() const {
-    return results;
-  }
+  //  [[nodiscard]] inline NeutralAtomMappingResults getResults() const {
+  //    return results;
+  //  }
   [[nodiscard]] inline std::map<uint32_t, uint32_t> getInitialMapping() const {
     return mappedQc.initialLayout;
   }
 
   // Constructors
-  NeutralAtomMapper(const qc::NeutralAtomArchitecture arch) : arch(arch){};
+  NeutralAtomMapper(const qc::NeutralAtomArchitecture& arch,
+                    InitialCoordinateMapping           initialCoordinateMapping)
+      : arch(arch), mappedQc(arch.getNqubits()),
+        hardwareQubits(arch, initialCoordinateMapping){};
 
   // Methods
   void map(qc::QuantumComputation& qc);

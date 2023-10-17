@@ -15,7 +15,14 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     this->lookaheadCandidates.emplace_back();
     this->frontCandidates.emplace_back();
   }
-  this->mappedQc = qc::QuantumComputation(qc.getNqubits());
+
+  std::cout << "test" << std::endl;
+
+  auto d = this->hardwareQubits.getSwapDistance(0, 1);
+  this->hardwareQubits.move(0, 20, this->arch);
+  d = this->hardwareQubits.getSwapDistance(0, 1);
+
+  //   precompute all distances
 
   createFrontLayer();
   //  printLayers();
