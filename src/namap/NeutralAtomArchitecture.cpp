@@ -119,8 +119,7 @@ void NeutralAtomArchitecture::computeSwapDistances(fp interactionRadius) {
             });
 
   // compute swap distances
-  this->swapDistances = SwapDistances(
-      this->getNpositions(), std::vector<uint32_t>(this->getNpositions(), 0));
+  this->swapDistances = SymmetricMatrix(this->getNpositions());
 
   for (uint32_t coordIndex1 = 0; coordIndex1 < this->getNpositions();
        coordIndex1++) {
@@ -140,10 +139,83 @@ void NeutralAtomArchitecture::computeSwapDistances(fp interactionRadius) {
         }
       }
       // save swap distance in matrix
-      this->swapDistances[coordIndex1][coordIndex2] = swapDistance - 1;
-      this->swapDistances[coordIndex2][coordIndex1] = swapDistance - 1;
+      this->swapDistances(coordIndex1, coordIndex2) = swapDistance - 1;
+      this->swapDistances(coordIndex2, coordIndex1) = swapDistance - 1;
     }
   }
+}
+
+void HardwareQubits::initSwapDistances(const NeutralAtomArchitecture& arch) {
+  swapDistances = SymmetricMatrix(arch.getNqubits());
+  for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
+    for (uint32_t j = 0; j < i; ++j) {
+      swapDistances(i, j) =
+          arch.getSwapDistance(hwToCoordIdx.at(i), hwToCoordIdx.at(j));
+    }
+  }
+}
+
+void HardwareQubits::updateSwapDistances(const NeutralAtomArchitecture& arch,
+                                         HwQubit                        qubit) {
+  for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
+    swapDistances(i, qubit) =
+        arch.getSwapDistance(hwToCoordIdx.at(i), hwToCoordIdx.at(qubit));
+  }
+}
+
+void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord,
+                          NeutralAtomArchitecture& arch) {
+  if (newCoord >= arch.getNpositions()) {
+    throw std::runtime_error("Invalid coordinate");
+  }
+  // check if new coordinate is already occupied
+  for (const auto& [qubit, coord] : hwToCoordIdx) {
+    if (coord == newCoord) {
+      throw std::runtime_error("Coordinate already occupied");
+    }
+  }
+  hwToCoordIdx.at(hwQubit) = newCoord;
+  updateSwapDistances(arch, hwQubit);
+}
+
+void HardwareQubits::swap(qc::HwQubit q1, qc::HwQubit q2,
+                          qc::Mapping& mapping) {
+  if (mapping.isMapped(q1) && mapping.isMapped(q2)) {
+    auto circQ1 = mapping.getCircQubit(q1);
+    mapping.setCircuitQubit(mapping.getCircQubit(q2), q1);
+    mapping.setCircuitQubit(circQ1, q2);
+  } else if (mapping.isMapped(q1) && !mapping.isMapped(q2)) {
+    mapping.setCircuitQubit(mapping.getCircQubit(q1), q2);
+    mapping.removeCircuitQubit(q1);
+  } else if (mapping.isMapped(q2) && !mapping.isMapped(q1)) {
+    mapping.setCircuitQubit(mapping.getCircQubit(q2), q1);
+    mapping.removeCircuitQubit(q2);
+  } else {
+    throw std::runtime_error("Cannot swap unmapped qubits");
+  }
+}
+
+std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
+  std::vector<Swap> swaps;
+  auto              nearbyQubits = getNearbyQubits(q);
+  swaps.reserve(nearbyQubits.size());
+  for (const auto& nearbyQubit : nearbyQubits) {
+    swaps.emplace_back(q, nearbyQubit);
+  }
+  return swaps;
+}
+
+std::vector<HwQubit> HardwareQubits::getNearbyQubits(qc::HwQubit q) {
+  std::vector<HwQubit> nearbyQubits;
+  for (uint32_t i = 0; i < swapDistances.getSize(); ++i) {
+    if (i == q) {
+      continue;
+    }
+    if (swapDistances(q, i) == 0) {
+      nearbyQubits.emplace_back(i);
+    }
+  }
+  return nearbyQubits;
 }
 
 } // namespace qc

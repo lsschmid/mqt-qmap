@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ShuttlingOperation.hpp"
+#include "namap/NeutralAtomUtils.hpp"
 #include "utils.hpp"
 
 #include <cstdint>
@@ -12,9 +13,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-
-using SwapDistances = std::vector<std::vector<std::uint32_t>>;
-using CoordIndex    = std::uint32_t;
 
 namespace qc {
 class NeutralAtomArchitecture {
@@ -117,7 +115,7 @@ protected:
   Properties              properties{};
   Parameters              parameters;
   std::vector<Coordinate> coordinates;
-  SwapDistances           swapDistances;
+  SymmetricMatrix         swapDistances;
 
   void createCoordinates();
   void computeSwapDistances(fp interactionRadius);
@@ -125,7 +123,7 @@ protected:
 public:
   std::string name;
 
-  NeutralAtomArchitecture() = default;
+  NeutralAtomArchitecture() = delete;
   // create from JSON file
   explicit NeutralAtomArchitecture(const std::string& filename);
 
@@ -144,6 +142,9 @@ public:
   [[nodiscard]] inline std::uint16_t getNAodCoordinates() const {
     return properties.getNAodCoordinates();
   }
+  [[nodiscard]] inline std::uint32_t getNqubits() const {
+    return parameters.nQubits;
+  }
   [[nodiscard]] inline fp getInterQubitDistance() const {
     return properties.getInterQubitDistance();
   }
@@ -156,12 +157,12 @@ public:
   }
   [[nodiscard]] inline fp getSwapDistance(std::uint32_t idx1,
                                           std::uint32_t idx2) const {
-    return swapDistances[idx1][idx2];
+    return swapDistances(idx1, idx2);
   }
   [[nodiscard]] inline fp getSwapDistance(const Coordinate& c1,
                                           const Coordinate& c2) const {
-    return swapDistances[c1.getX() + c1.getY() * properties.getNcolumns()]
-                        [c2.getX() + c2.getY() * properties.getNcolumns()];
+    return swapDistances(c1.getX() + c1.getY() * properties.getNcolumns(),
+                         c2.getX() + c2.getY() * properties.getNcolumns());
   }
 
   [[nodiscard]] inline fp getGateTime(OpType opType) const {
