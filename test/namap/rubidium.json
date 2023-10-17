@@ -1,0 +1,43 @@
+{
+  "name": "rubidium",
+  "properties": {
+    "nRows": 5,
+    "nColumns": 5,
+    "nAods": 2,
+    "nAodCoordinates": 2,
+    "interQubitDistance": 0.574,
+    "interactionRadius": 2,
+    "blockingFactor": 1
+  },
+  "parameters": {
+    "nQubits": 15,
+    "gateTimes": {
+      "h": 0.5,
+      "p": 0.001,
+      "cx": 0.7,
+      "cz": 0.2,
+      "mcx": 2.5
+    },
+    "gateAverageFidelities": {
+      "h": 0.999,
+      "p": 0.999,
+      "cx": 0.994,
+      "cz": 0.995,
+      "mcx": 0.95
+    },
+    "decoherenceTimes": {
+      "t1": 100000000,
+      "t2": 1500000
+    },
+    "shuttlingTimes": {
+      "move": 0.55,
+      "activate": 40,
+      "deactivate": 40
+    },
+    "shuttlingAverageFidelities": {
+      "move": 1,
+      "activate": 1,
+      "deactivate": 1
+    }
+  }
+}
