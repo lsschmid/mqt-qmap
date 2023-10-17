@@ -220,14 +220,99 @@ public:
   [[nodiscard]] inline uint32_t getManhattenDistanceY(const Coordinate& c1) {
     return c1.getManhattenDistanceY(c1);
   }
+};
 
-  [[nodiscard]] inline uint32_t getSwapDistance(std::uint32_t idx1,
-                                                std::uint32_t idx2) {
-    return swapDistances[idx1][idx2];
+using HwQubit = uint32_t;
+using Swap    = std::pair<HwQubit, HwQubit>;
+
+// class to manage the mapping between circuit qubits and hardware qubits
+// in a bijective manner
+class Mapping {
+protected:
+  std::map<Qubit, HwQubit> circToHw;
+  std::map<HwQubit, Qubit> hwToCirc;
+
+public:
+  Mapping() = default;
+  Mapping(uint32_t nQubits, InitialMapping& initialMapping) {
+    switch (initialMapping) {
+    case Identity:
+      for (uint32_t i = 0; i < nQubits; ++i) {
+        circToHw.insert({i, i});
+        hwToCirc.insert({i, i});
+      }
+      break;
+    }
   }
-  [[nodiscard]] inline uint32_t getSwapDistance(const Coordinate& c1,
-                                                const Coordinate& c2) {
-    return swapDistances[this->getIndex(c1)][this->getIndex(c2)];
+  void inline setCircuitQubit(Qubit qubit, HwQubit hwQubit) {
+    circToHw.insert({qubit, hwQubit});
+    hwToCirc.insert({hwQubit, qubit});
+  }
+  void inline removeCircuitQubit(Qubit qubit) {
+    auto hwQubit = circToHw.at(qubit);
+    circToHw.erase(qubit);
+    hwToCirc.erase(hwQubit);
+  }
+
+  [[nodiscard]] inline HwQubit getHwQubit(Qubit qubit) const {
+    return circToHw.at(qubit);
+  }
+  [[nodiscard]] inline Qubit getCircQubit(HwQubit qubit) const {
+    return hwToCirc.at(qubit);
+  }
+  [[nodiscard]] inline bool isMapped(HwQubit qubit) const {
+    return hwToCirc.find(qubit) != hwToCirc.end();
   }
 };
+
+// Class to manage hardware qubit handling
+class HardwareQubits {
+protected:
+  //        std::map<Qubit, Qubit>      circToHw;
+  std::map<HwQubit, CoordIndex> hwToCoordIdx;
+  SymmetricMatrix               swapDistances;
+
+  void initSwapDistances(const NeutralAtomArchitecture& arch);
+  void updateSwapDistances(const NeutralAtomArchitecture& arch, HwQubit qubit);
+
+public:
+  HardwareQubits() = delete;
+  HardwareQubits(const NeutralAtomArchitecture& arch,
+                 InitialCoordinateMapping&      initialCoordinateMapping)
+      : swapDistances(arch.getNqubits()) {
+    switch (initialCoordinateMapping) {
+    case Trivial:
+      for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
+        hwToCoordIdx.insert({i, i});
+      }
+      break;
+    }
+    initSwapDistances(arch);
+  }
+
+  [[nodiscard]] inline fp getSwapDistance(HwQubit q1, HwQubit q2) const {
+    return swapDistances(q1, q2);
+  }
+  [[nodiscard]] inline CoordIndex getCoordIndex(HwQubit qubit) const {
+    return hwToCoordIdx.at(qubit);
+  }
+  [[nodiscard]] inline Qubit getQubit(CoordIndex coordIndex) const {
+    for (auto const& [qubit, index] : hwToCoordIdx) {
+      if (index == coordIndex) {
+        return qubit;
+      }
+    }
+    throw std::runtime_error("There is no qubit at this coordinate " +
+                             std::to_string(coordIndex));
+  }
+
+  void move(HwQubit hwQubit, CoordIndex newCoord,
+            NeutralAtomArchitecture& arch);
+
+  static void swap(HwQubit q1, HwQubit q2, Mapping& mapping);
+
+  std::vector<Swap>    getNearbySwaps(HwQubit q);
+  std::vector<HwQubit> getNearbyQubits(HwQubit q);
+};
+
 } // namespace qc
