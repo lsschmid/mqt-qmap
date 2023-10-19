@@ -20,7 +20,7 @@ protected:
   qc::QuantumComputation                       mappedQc;
   std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
   GateList                                     frontLayer;
-  std::vector<Qubit>                           frontQubitsToUpdate;
+  std::set<Qubit>                              frontQubitsToUpdate;
   std::vector<GateList>                        frontCandidates;
   DAG                                          dag;
   DAGIterators                                 frontLayerIterators;
@@ -33,6 +33,7 @@ protected:
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;
   Mapping        mapping;
+  bool           verbose = true;
 
   // Methods for layer creation
   void createFrontLayer();

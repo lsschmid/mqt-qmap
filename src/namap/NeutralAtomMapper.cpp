@@ -10,6 +10,7 @@
 
 namespace qc {
 void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
+  qc::CircuitOptimizer::removeFinalMeasurements(qc);
   this->dag     = qc::CircuitOptimizer::constructDAG(qc);
   this->mapping = Mapping(qc.getNqubits(), InitialMapping::Identity);
   for (auto& i : dag) {
@@ -21,15 +22,16 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
 
   std::cout << "test" << std::endl;
 
+  this->verbose = false;
+
   //   precompute all distances
 
   createFrontLayer();
-  auto gatesToExecute = getExecutableGates();
-  updateFrontLayerByGate(gatesToExecute);
   //  printLayers();
   updateLookaheadLayerByQubit();
-  printLayers();
-
+  if (this->verbose) {
+    printLayers();
+  }
   // probably need
   // updateFrontLayerByQubit(list with all qubits) to trigger commutation
 
@@ -46,11 +48,11 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
       gatesToExecute = getExecutableGates();
     }
     updateFrontLayerByGate(gatesToExecute);
-    gatesToExecute = getExecutableGates();
-    updateFrontLayerByGate(gatesToExecute);
     //    printLayers();
     updateLookaheadLayerByQubit();
-    printLayers();
+    if (this->verbose) {
+      printLayers();
+    }
   }
 }
 
@@ -59,12 +61,12 @@ void qc::NeutralAtomMapper::createFrontLayer() {
   std::vector<Qubit> allQubits;
   for (uint32_t i = 0; i < this->dag.size(); i++) {
     allQubits.push_back(i);
+    this->frontQubitsToUpdate.insert(i);
   }
-  this->lookaheadQubitsToUpdate = allQubits;
-  updateLookaheadLayerByQubit();
-  this->lookaheadQubitsToUpdate.clear();
-  this->frontQubitsToUpdate = allQubits;
   updateFrontLayerByQubit();
+  lookaheadQubitsToUpdate = allQubits;
+  updateLookaheadLayerByQubit();
+  lookaheadQubitsToUpdate.clear();
 }
 
 void qc::NeutralAtomMapper::updateFrontLayerByGate(
@@ -72,18 +74,13 @@ void qc::NeutralAtomMapper::updateFrontLayerByGate(
   for (auto* gate : gatesToExecute) {
     // add other gate qubits to be checked
     for (auto qubit : (*gate)->getUsedQubits()) {
-      if (std::find(this->frontQubitsToUpdate.begin(),
-                    this->frontQubitsToUpdate.end(),
-                    qubit) == this->frontQubitsToUpdate.end()) {
-        this->frontQubitsToUpdate.push_back(qubit);
-      }
+      this->frontQubitsToUpdate.insert(qubit);
+      this->lookaheadOffsets[qubit]--;
+      this->frontLayerIterators[qubit]++;
     }
     // remove from current FrontLayer
     mapGate(gate);
     // update DAG iterators
-    for (auto gateQubit : (*gate)->getUsedQubits()) {
-      this->lookaheadOffsets[gateQubit]--;
-    }
     // remove from FrontLayer
     this->frontLayer.erase(
         std::find(this->frontLayer.begin(), this->frontLayer.end(), gate));
@@ -94,7 +91,6 @@ void qc::NeutralAtomMapper::updateFrontLayerByGate(
 void qc::NeutralAtomMapper::updateFrontLayerByQubit() {
   findFrontCandidates();
   updateFrontLayerByCandidates();
-  this->frontQubitsToUpdate.clear();
 }
 
 void qc::NeutralAtomMapper::findFrontCandidates() {
@@ -103,16 +99,10 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
     while (tempIter != this->dag[qubit].end()) {
       auto* opPointer = *tempIter;
       if (opPointer->get()->getUsedQubits().size() == 1) {
-        if (std::find(this->executedCommutingGates.rbegin(),
-                      this->executedCommutingGates.rend(),
-                      opPointer) == this->executedCommutingGates.rend()) {
-          mapGate(opPointer);
-        }
+        mapGate(opPointer);
+        this->frontLayerIterators[qubit]++;
         tempIter++;
       } else {
-        this->frontCandidates[qubit].insert(opPointer);
-        tempIter++;
-
         // continue if following gates commute
         bool commutes = true;
         while (commutes && tempIter != this->dag[qubit].end()) {
@@ -122,7 +112,6 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
           if (commutes) {
             if (nextOpPointer->get()->getUsedQubits().size() == 1) {
               mapGate(nextOpPointer);
-              this->executedCommutingGates.push_back(nextOpPointer);
             } else { // not executable but commutes
               this->frontCandidates[qubit].insert(nextOpPointer);
             }
@@ -137,11 +126,18 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
 
 void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
   std::vector<Qubit> qubitsToCheckNext;
-  for (auto& qubit : this->frontQubitsToUpdate) {
+  // create deep copy of frontQubitsToUpdate
+  const std::vector<Qubit> tempQubitsToUpdate(this->frontQubitsToUpdate.begin(),
+                                              this->frontQubitsToUpdate.end());
+  this->frontQubitsToUpdate.clear();
+  for (auto& qubit : tempQubitsToUpdate) {
     std::vector<std::unique_ptr<qc::Operation>*> toRemove;
     for (auto* opPointer : this->frontCandidates[qubit]) {
       bool  inFrontLayer = true;
       auto* op           = opPointer->get();
+      if (op->getType() == qc::OpType::I) {
+        continue;
+      }
       for (const auto& opQubit : op->getUsedQubits()) {
         if (qubit == opQubit) {
           continue;
@@ -157,8 +153,18 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
         // if executable execute directly
         if (isExecutable(opPointer)) {
           mapGate(opPointer);
+          for (const auto& opQubit : op->getUsedQubits()) {
+            this->frontLayerIterators[opQubit]++;
+            this->frontQubitsToUpdate.insert(opQubit);
+          }
+          // remove from lookahead layer if there
+          if (this->lookaheadLayer.find(opPointer) !=
+              this->lookaheadLayer.end()) {
+            this->lookaheadLayer.erase(opPointer);
+          }
+        } else {
+          addToFrontLayer(opPointer);
         }
-        addToFrontLayer(opPointer);
         // remove from candidacy of other qubits
         for (const auto& opQubit : op->getUsedQubits()) {
           qubitsToCheckNext.push_back(opQubit);
@@ -179,6 +185,10 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
     }
   }
   this->lookaheadQubitsToUpdate = qubitsToCheckNext;
+  // if gates have been executed directly refresh front layer
+  if (!this->frontQubitsToUpdate.empty()) {
+    updateFrontLayerByQubit();
+  }
 }
 
 bool qc::NeutralAtomMapper::commutesWith(
@@ -326,6 +336,10 @@ void qc::NeutralAtomMapper::findLookaheadCandidates() {
            foundMultiQubitGate < this->lookaheadDepth) {
       auto* opPointer = *lookaheadIter;
       auto* op        = opPointer->get();
+      if (op->getType() == qc::OpType::I) {
+        lookaheadIter++;
+        continue;
+      }
       if (op->getUsedQubits().size() > 1) {
         foundMultiQubitGate++;
         this->lookaheadCandidates[qubit].insert(opPointer);
@@ -353,21 +367,19 @@ void qc::NeutralAtomMapper::findLookaheadCandidates() {
 }
 
 void qc::NeutralAtomMapper::mapGate(std::unique_ptr<qc::Operation>* op) {
+  if (op->get()->getType() == qc::OpType::I) {
+    return;
+  }
   this->mappedQc.emplace_back((*op)->clone());
-  for (auto qubit : (*op)->getUsedQubits()) {
-    this->frontLayerIterators[qubit]++;
-    if (qubit == 0) {
-      this->debugCounter++;
-      std::cout << "debugCounter single commute " << this->debugCounter
-                << std::endl;
+  if (this->verbose) {
+    std::cout << "mapped " << (*op)->getName() << " ";
+    for (auto qubit : (*op)->getUsedQubits()) {
+      std::cout << qubit << " ";
     }
+    std::cout << "\n";
   }
 
-  std::cout << "mapped " << (*op)->getName();
-  for (auto qubit : (*op)->getUsedQubits()) {
-    std::cout << " " << qubit;
-  }
-  std::cout << std::endl;
+  op->get()->setGate(qc::OpType::I);
 }
 
 bool qc::NeutralAtomMapper::isExecutable(
@@ -432,7 +444,20 @@ GateList NeutralAtomMapper::getExecutableGates() {
 void NeutralAtomMapper::updateMapping(qc::Swap swap) {
   this->mapping.swap(swap);
   this->mappedQc.swap(swap.first, swap.second);
-  std::cout << "swapped " << swap.first << " " << swap.second << std::endl;
+  if (this->verbose) {
+    std::cout << "swapped " << swap.first << " " << swap.second;
+    std::cout << "  logical qubits: ";
+    if (this->mapping.isMapped(swap.first)) {
+      std::cout << this->mapping.getCircQubit(swap.first);
+    } else {
+      std::cout << "not mapped";
+    }
+    if (this->mapping.isMapped(swap.second)) {
+      std::cout << " " << this->mapping.getCircQubit(swap.second);
+    } else {
+      std::cout << " not mapped";
+    }
+  }
 }
 
 qc::Swap qc::NeutralAtomMapper::findBestSwap() {
@@ -469,21 +494,29 @@ fp NeutralAtomMapper::distanceCost(qc::Swap swap) {
   fp distanceChange = 0;
   for (const auto& gate : this->frontLayer) {
     auto gateQubits = gate->get()->getUsedQubits();
+
+    // get hardware qubits
+    std::set<HwQubit> gateHwQubits;
+    for (const auto& qubit : gateQubits) {
+      gateHwQubits.insert(this->mapping.getHwQubit(qubit));
+    }
     // distance before
-    distanceChange -= this->hardwareQubits.getTotalDistance(gateQubits);
+    distanceChange -= this->hardwareQubits.getTotalDistance(gateHwQubits);
 
     // do swap
-    if (gateQubits.find(swap.first) != gateQubits.end()) {
-      gateQubits.insert(swap.second);
-      gateQubits.erase(swap.first);
-    } else if (gateQubits.find(swap.second) != gateQubits.end()) {
-      gateQubits.insert(swap.first);
-      gateQubits.erase(swap.second);
+    auto firstInGate  = gateHwQubits.find((swap.first)) != gateHwQubits.end();
+    auto secondInGate = gateHwQubits.find((swap.second)) != gateHwQubits.end();
+    if (firstInGate && !secondInGate) {
+      gateHwQubits.insert(swap.second);
+      gateHwQubits.erase(swap.first);
+    } else if (!firstInGate && secondInGate) {
+      gateHwQubits.insert(swap.first);
+      gateHwQubits.erase(swap.second);
     } else {
       continue;
     }
     // distance after
-    distanceChange += this->hardwareQubits.getTotalDistance(gateQubits);
+    distanceChange += this->hardwareQubits.getTotalDistance(gateHwQubits);
   }
   return distanceChange;
 }
