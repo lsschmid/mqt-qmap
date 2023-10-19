@@ -14,7 +14,6 @@ namespace qc {
 class Mapping {
 protected:
   std::map<Qubit, HwQubit> circToHw;
-  std::map<HwQubit, Qubit> hwToCirc;
 
 public:
   Mapping() = default;
@@ -23,29 +22,30 @@ public:
     case Identity:
       for (size_t i = 0; i < nQubits; ++i) {
         circToHw.insert({i, i});
-        hwToCirc.insert({i, i});
       }
       break;
     }
   }
   void inline setCircuitQubit(Qubit qubit, HwQubit hwQubit) {
-    circToHw.insert({qubit, hwQubit});
-    hwToCirc.insert({hwQubit, qubit});
-  }
-  void inline removeCircuitQubit(Qubit qubit) {
-    auto hwQubit = circToHw.at(qubit);
-    circToHw.erase(qubit);
-    hwToCirc.erase(hwQubit);
+    circToHw[qubit] = hwQubit;
   }
 
   [[nodiscard]] inline HwQubit getHwQubit(Qubit qubit) const {
     return circToHw.at(qubit);
   }
   [[nodiscard]] inline Qubit getCircQubit(HwQubit qubit) const {
-    return hwToCirc.at(qubit);
+    for (const auto& [circQubit, hwQubit] : circToHw) {
+      if (hwQubit == qubit) {
+        return circQubit;
+      }
+    }
+    throw std::runtime_error("Hardware qubit not mapped");
   }
+
   [[nodiscard]] inline bool isMapped(HwQubit qubit) const {
-    return hwToCirc.find(qubit) != hwToCirc.end();
+    return std::any_of(
+        circToHw.begin(), circToHw.end(),
+        [qubit](const auto& pair) { return pair.second == qubit; });
   }
 
   void swap(Swap swap);
