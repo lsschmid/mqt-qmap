@@ -1,6 +1,6 @@
 [submodule "extern/mqt-core"]
 	path = extern/mqt-core
-	url = https://github.com/cda-tum/mqt-core.git
+	url = https://github.com/lsschmid/mqt-core
 	branch = main
 [submodule "extern/LogicBlocks"]
 	path = extern/LogicBlocks
