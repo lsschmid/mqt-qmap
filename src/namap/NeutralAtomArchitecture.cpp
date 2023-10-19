@@ -145,6 +145,27 @@ void NeutralAtomArchitecture::computeSwapDistances(fp interactionRadius) {
   }
 }
 
+void Mapping::swap(Swap swap) {
+  auto q1 = swap.first;
+  auto q2 = swap.second;
+  if (this->isMapped(q1) && this->isMapped(q2)) {
+    auto circQ1 = this->getCircQubit(q1);
+    auto circQ2 = this->getCircQubit(q2);
+    this->removeCircuitQubit(circQ1);
+    this->removeCircuitQubit(circQ2);
+    this->setCircuitQubit(circQ2, q1);
+    this->setCircuitQubit(circQ1, q2);
+  } else if (this->isMapped(q1) && !this->isMapped(q2)) {
+    this->setCircuitQubit(this->getCircQubit(q1), q2);
+    this->removeCircuitQubit(q1);
+  } else if (this->isMapped(q2) && !this->isMapped(q1)) {
+    this->setCircuitQubit(this->getCircQubit(q2), q1);
+    this->removeCircuitQubit(q2);
+  } else {
+    throw std::runtime_error("Cannot swap unmapped qubits");
+  }
+}
+
 void HardwareQubits::initSwapDistances(const NeutralAtomArchitecture& arch) {
   swapDistances = SymmetricMatrix(arch.getNqubits());
   for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
@@ -178,23 +199,6 @@ void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord,
   updateSwapDistances(arch, hwQubit);
 }
 
-void HardwareQubits::swap(qc::HwQubit q1, qc::HwQubit q2,
-                          qc::Mapping& mapping) {
-  if (mapping.isMapped(q1) && mapping.isMapped(q2)) {
-    auto circQ1 = mapping.getCircQubit(q1);
-    mapping.setCircuitQubit(mapping.getCircQubit(q2), q1);
-    mapping.setCircuitQubit(circQ1, q2);
-  } else if (mapping.isMapped(q1) && !mapping.isMapped(q2)) {
-    mapping.setCircuitQubit(mapping.getCircQubit(q1), q2);
-    mapping.removeCircuitQubit(q1);
-  } else if (mapping.isMapped(q2) && !mapping.isMapped(q1)) {
-    mapping.setCircuitQubit(mapping.getCircQubit(q2), q1);
-    mapping.removeCircuitQubit(q2);
-  } else {
-    throw std::runtime_error("Cannot swap unmapped qubits");
-  }
-}
-
 std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
   std::vector<Swap> swaps;
   auto              nearbyQubits = getNearbyQubits(q);
@@ -218,4 +222,30 @@ std::vector<HwQubit> HardwareQubits::getNearbyQubits(qc::HwQubit q) {
   return nearbyQubits;
 }
 
+fp HardwareQubits::getTotalDistance(std::set<Qubit>& qubits) {
+  // two qubit gates
+  if (qubits.size() == 2) {
+    auto it = qubits.begin();
+    auto q1 = *it;
+    auto q2 = *(++it);
+    return swapDistances(q1, q2);
+  }
+  if (qubits.size() == 3) {
+    // TODO substitute with special case taking into consideration the geometry
+    auto it = qubits.begin();
+    auto q1 = *it;
+    auto q2 = *(++it);
+    auto q3 = *(++it);
+    return swapDistances(q1, q2) + swapDistances(q2, q3) +
+           swapDistances(q1, q3);
+  }
+  // more than three qubits just minimize total distance
+  fp totalDistance = 0;
+  for (auto it1 = qubits.begin(); it1 != qubits.end(); ++it1) {
+    for (auto it2 = std::next(it1); it2 != qubits.end(); ++it2) {
+      totalDistance += swapDistances(*it1, *it2);
+    }
+  }
+  return totalDistance;
+}
 } // namespace qc

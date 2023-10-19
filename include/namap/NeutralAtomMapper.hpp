@@ -11,22 +11,23 @@
 
 namespace qc {
 
+using GateList = std::set<std::unique_ptr<qc::Operation>*>;
 class NeutralAtomMapper {
 protected:
-  using Layer = std::set<std::unique_ptr<qc::Operation>*>;
-
-  qc::NeutralAtomArchitecture arch;
-  qc::QuantumComputation      mappedQc;
-  Layer                       frontLayer;
-  std::vector<Qubit>          frontQubitsToUpdate;
-  std::vector<Layer>          frontCandidates;
-  DAG                         dag;
-  DAGIterators                frontLayerIterators;
-  Layer                       lookaheadLayer;
-  std::vector<uint32_t>       lookaheadOffsets;
-  std::vector<Layer>          lookaheadCandidates;
-  std::vector<Qubit>          lookaheadQubitsToUpdate;
-  uint32_t                    lookaheadDepth = 1;
+  qc::NeutralAtomArchitecture                  arch;
+  qc::QuantumComputation                       mappedQc;
+  std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
+  GateList                                     frontLayer;
+  std::vector<Qubit>                           frontQubitsToUpdate;
+  std::vector<GateList>                        frontCandidates;
+  DAG                                          dag;
+  DAGIterators                                 frontLayerIterators;
+  GateList                                     lookaheadLayer;
+  std::vector<uint32_t>                        lookaheadOffsets;
+  std::vector<GateList>                        lookaheadCandidates;
+  std::vector<Qubit>                           lookaheadQubitsToUpdate;
+  uint32_t                                     lookaheadDepth = 1;
+  uint32_t                                     debugCounter   = 0;
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;
   Mapping        mapping;
@@ -42,18 +43,24 @@ protected:
   void        findLookaheadCandidates();
   void        updateLookaheadLayerByCandidates();
   void        mapGate(std::unique_ptr<qc::Operation>* op);
-  static bool commutesWith(Layer&                          layer,
+  static bool commutesWith(GateList&                       layer,
                            std::unique_ptr<qc::Operation>* opPointer);
   static bool commute(std::unique_ptr<qc::Operation>* opPointer1,
                       std::unique_ptr<qc::Operation>* opPointer2);
   static bool
-  commuteSingleQubitZAndControl(std::unique_ptr<qc::Operation>* opPointer1,
-                                std::unique_ptr<qc::Operation>* opPointer2);
-  static bool isExecutable(qc::Operation* op);
-  void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
+       commuteSingleQubitZAndControl(std::unique_ptr<qc::Operation>* opPointer1,
+                                     std::unique_ptr<qc::Operation>* opPointer2);
+  bool isExecutable(std::unique_ptr<qc::Operation>* opPointer);
+  void addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
 
   // Methods for mapping
-  void initCoordinates(InitialCoordinateMapping initialCoordinateMapping);
+  Swap           findBestSwap();
+  GateList       getExecutableGates();
+  std::set<Swap> getAllPossibleSwaps();
+  void           updateMapping(Swap swap);
+
+  // Methods cost functions
+  fp distanceCost(Swap swap);
 
   // temp
   void printLayers();

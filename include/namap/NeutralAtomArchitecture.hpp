@@ -234,10 +234,10 @@ protected:
 
 public:
   Mapping() = default;
-  Mapping(uint32_t nQubits, InitialMapping& initialMapping) {
+  Mapping(size_t nQubits, InitialMapping initialMapping) {
     switch (initialMapping) {
     case Identity:
-      for (uint32_t i = 0; i < nQubits; ++i) {
+      for (size_t i = 0; i < nQubits; ++i) {
         circToHw.insert({i, i});
         hwToCirc.insert({i, i});
       }
@@ -263,6 +263,8 @@ public:
   [[nodiscard]] inline bool isMapped(HwQubit qubit) const {
     return hwToCirc.find(qubit) != hwToCirc.end();
   }
+
+  void swap(Swap swap);
 };
 
 // Class to manage hardware qubit handling
@@ -309,10 +311,9 @@ public:
   void move(HwQubit hwQubit, CoordIndex newCoord,
             NeutralAtomArchitecture& arch);
 
-  static void swap(HwQubit q1, HwQubit q2, Mapping& mapping);
-
   std::vector<Swap>    getNearbySwaps(HwQubit q);
   std::vector<HwQubit> getNearbyQubits(HwQubit q);
+  fp                   getTotalDistance(std::set<HwQubit>& qubits);
 };
 
 } // namespace qc
