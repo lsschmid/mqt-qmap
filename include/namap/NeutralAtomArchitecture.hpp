@@ -91,11 +91,11 @@ class NeutralAtomArchitecture {
   };
 
   struct Parameters {
-    std::uint32_t               nQubits;
-    std::map<OpType, fp>        gateTimes;
-    std::map<OpType, fp>        gateAverageFidelities;
-    std::map<ShuttlingType, fp> shuttlingTimes;
-    std::map<ShuttlingType, fp> shuttlingAverageFidelities;
+    std::uint32_t        nQubits;
+    std::map<OpType, fp> gateTimes;
+    std::map<OpType, fp> gateAverageFidelities;
+    std::map<OpType, fp> shuttlingTimes;
+    std::map<OpType, fp> shuttlingAverageFidelities;
     class DecoherenceTimes {
     protected:
       fp tEff;
@@ -171,11 +171,11 @@ public:
   [[nodiscard]] inline fp getGateAverageFidelity(OpType opType) const {
     return parameters.gateAverageFidelities.at(opType);
   }
-  [[nodiscard]] inline fp getShuttlingTime(ShuttlingType shuttlingType) const {
+  [[nodiscard]] inline fp getShuttlingTime(OpType shuttlingType) const {
     return parameters.shuttlingTimes.at(shuttlingType);
   }
   [[nodiscard]] inline fp
-  getShuttlingAverageFidelity(ShuttlingType shuttlingType) const {
+  getShuttlingAverageFidelity(OpType shuttlingType) const {
     return parameters.shuttlingAverageFidelities.at(shuttlingType);
   }
   [[nodiscard]] inline fp getDecoherenceTime() const {

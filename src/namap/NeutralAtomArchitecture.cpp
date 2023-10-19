@@ -45,18 +45,17 @@ void NeutralAtomArchitecture::loadJson(const std::string& filename) {
       gateAverageFidelities.insert({OP_NAME_TO_TYPE.at(key), value});
     }
     this->parameters.gateAverageFidelities = gateAverageFidelities;
-    std::map<ShuttlingType, fp> shuttlingTimes;
+    std::map<OpType, fp> shuttlingTimes;
 
     for (const auto& [key, value] :
          jsonDataParameters["shuttlingTimes"].items()) {
-      shuttlingTimes.insert({SHUTTLING_OP_NAME_TO_TYPE.at(key), value});
+      shuttlingTimes.insert({OP_NAME_TO_TYPE.at(key), value});
     }
     this->parameters.shuttlingTimes = shuttlingTimes;
-    std::map<ShuttlingType, fp> shuttlingAverageFidelities;
+    std::map<OpType, fp> shuttlingAverageFidelities;
     for (const auto& [key, value] :
          jsonDataParameters["shuttlingAverageFidelities"].items()) {
-      shuttlingAverageFidelities.insert(
-          {SHUTTLING_OP_NAME_TO_TYPE.at(key), value});
+      shuttlingAverageFidelities.insert({OP_NAME_TO_TYPE.at(key), value});
     }
     this->parameters.shuttlingAverageFidelities = shuttlingAverageFidelities;
 
