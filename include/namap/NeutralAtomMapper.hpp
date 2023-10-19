@@ -6,6 +6,8 @@
 
 #include "NeutralAtomMappingResults.hpp"
 #include "QuantumComputation.hpp"
+#include "namap/HardwareQubits.hpp"
+#include "namap/Mapping.hpp"
 #include "namap/NeutralAtomArchitecture.hpp"
 #include "namap/NeutralAtomUtils.hpp"
 

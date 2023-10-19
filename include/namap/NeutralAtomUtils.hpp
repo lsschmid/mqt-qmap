@@ -5,12 +5,10 @@
 #pragma once
 
 #include "Definitions.hpp"
-#include "namap/NeutralAtomArchitecture.hpp"
 #include "utils.hpp"
 
 namespace qc {
 
-using CoordIndex = std::uint32_t;
 // Symmetric matrix class with same number of rows and columns that allows
 // access by row and column but uses less memory than a full matrix
 
