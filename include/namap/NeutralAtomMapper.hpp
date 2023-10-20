@@ -16,6 +16,10 @@ namespace qc {
 using GateList = std::set<std::unique_ptr<qc::Operation>*>;
 class NeutralAtomMapper {
 protected:
+  struct MapperParameters {
+    fp lookaheadWeight = 0.1;
+  };
+
   qc::NeutralAtomArchitecture                  arch;
   qc::QuantumComputation                       mappedQc;
   std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
@@ -27,9 +31,11 @@ protected:
   GateList                                     lookaheadLayer;
   std::vector<uint32_t>                        lookaheadOffsets;
   std::vector<GateList>                        lookaheadCandidates;
-  std::vector<Qubit>                           lookaheadQubitsToUpdate;
+  std::set<Qubit>                              lookaheadQubitsToUpdate;
   uint32_t                                     lookaheadDepth = 1;
-  uint32_t                                     debugCounter   = 0;
+  MapperParameters                             parameters;
+  uint32_t                                     nSwaps = 0;
+
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;
   Mapping        mapping;
@@ -63,7 +69,8 @@ protected:
   void           updateMapping(Swap swap);
 
   // Methods cost functions
-  fp distanceCost(Swap swap);
+  fp distanceCost(const Swap& swap);
+  fp distancePerLayer(const Swap& swap, GateList& layer);
 
   // temp
   void printLayers();

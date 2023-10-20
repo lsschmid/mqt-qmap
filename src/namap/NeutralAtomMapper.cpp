@@ -20,9 +20,14 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     this->frontCandidates.emplace_back();
   }
 
+  if (dag.size() > arch.getNqubits()) {
+    throw std::runtime_error("More qubits in circuit than in architecture");
+  }
+
   std::cout << "test" << std::endl;
 
-  this->verbose = false;
+  this->parameters.lookaheadWeight = 0.5;
+  this->verbose                    = false;
 
   //   precompute all distances
 
@@ -40,11 +45,14 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   auto i = 0;
   while (!this->frontLayer.empty()) {
     i++;
-    std::cout << "iteration " << i << std::endl;
+    if (this->verbose) {
+      std::cout << "iteration " << i << std::endl;
+    }
     std::set<std::unique_ptr<Operation>*> gatesToExecute;
     while (gatesToExecute.empty()) {
       auto bestSwap = findBestSwap();
       updateMapping(bestSwap);
+      nSwaps++;
       gatesToExecute = getExecutableGates();
     }
     updateFrontLayerByGate(gatesToExecute);
@@ -54,6 +62,7 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
       printLayers();
     }
   }
+  std::cout << "nSwaps: " << nSwaps << std::endl;
 }
 
 void qc::NeutralAtomMapper::createFrontLayer() {
@@ -62,9 +71,9 @@ void qc::NeutralAtomMapper::createFrontLayer() {
   for (uint32_t i = 0; i < this->dag.size(); i++) {
     allQubits.push_back(i);
     this->frontQubitsToUpdate.insert(i);
+    this->lookaheadQubitsToUpdate.insert(i);
   }
   updateFrontLayerByQubit();
-  lookaheadQubitsToUpdate = allQubits;
   updateLookaheadLayerByQubit();
   lookaheadQubitsToUpdate.clear();
 }
@@ -125,7 +134,6 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
 }
 
 void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
-  std::vector<Qubit> qubitsToCheckNext;
   // create deep copy of frontQubitsToUpdate
   const std::vector<Qubit> tempQubitsToUpdate(this->frontQubitsToUpdate.begin(),
                                               this->frontQubitsToUpdate.end());
@@ -164,11 +172,14 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
           }
         } else {
           addToFrontLayer(opPointer);
+          // move lookahead
+          for (const auto& opQubit : op->getUsedQubits()) {
+            this->lookaheadOffsets[opQubit]++;
+          }
         }
         // remove from candidacy of other qubits
         for (const auto& opQubit : op->getUsedQubits()) {
-          qubitsToCheckNext.push_back(opQubit);
-          this->lookaheadOffsets[opQubit]++;
+          this->lookaheadQubitsToUpdate.insert(opQubit);
           if (qubit == opQubit) {
             continue;
           }
@@ -180,11 +191,11 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
       }
     }
     // remove from candidacy of this qubit
+    // has to be done now to not change iterating list
     for (auto* opPointer : toRemove) {
       this->frontCandidates[qubit].erase(opPointer);
     }
   }
-  this->lookaheadQubitsToUpdate = qubitsToCheckNext;
   // if gates have been executed directly refresh front layer
   if (!this->frontQubitsToUpdate.empty()) {
     updateFrontLayerByQubit();
@@ -457,13 +468,15 @@ void NeutralAtomMapper::updateMapping(qc::Swap swap) {
     } else {
       std::cout << " not mapped";
     }
+    std::cout << std::endl;
   }
 }
 
 qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   auto swaps = getAllPossibleSwaps();
   // evaluate swaps based on cost function
-  std::vector<std::pair<Swap, double>> swapCosts;
+  std::vector<std::pair<Swap, fp>> swapCosts;
+  //  swapCosts.reserve(swaps.size());
   for (const auto& swap : swaps) {
     swapCosts.emplace_back(swap, distanceCost(swap));
   }
@@ -489,10 +502,20 @@ std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
   return swaps;
 }
 
-fp NeutralAtomMapper::distanceCost(qc::Swap swap) {
+fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
   // compute the change in total distance
+  auto distanceChangeFront = distancePerLayer(swap, this->frontLayer) /
+                             static_cast<fp>(this->frontLayer.size());
+  auto distanceChangeLookahead = distancePerLayer(swap, this->lookaheadLayer) /
+                                 static_cast<fp>(this->lookaheadLayer.size());
+  auto cost = parameters.lookaheadWeight * distanceChangeLookahead +
+              distanceChangeFront;
+  return cost;
+}
+
+fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
   fp distanceChange = 0;
-  for (const auto& gate : this->frontLayer) {
+  for (const auto& gate : layer) {
     auto gateQubits = gate->get()->getUsedQubits();
 
     // get hardware qubits
@@ -512,8 +535,6 @@ fp NeutralAtomMapper::distanceCost(qc::Swap swap) {
     } else if (!firstInGate && secondInGate) {
       gateHwQubits.insert(swap.first);
       gateHwQubits.erase(swap.second);
-    } else {
-      continue;
     }
     // distance after
     distanceChange += this->hardwareQubits.getTotalDistance(gateHwQubits);
