@@ -63,30 +63,54 @@ std::vector<HwQubit> HardwareQubits::getNearbyQubits(qc::HwQubit q) {
   return nearbyQubits;
 }
 
-fp HardwareQubits::getTotalDistance(std::set<Qubit>& qubits) {
+fp HardwareQubits::getTotalDistance(std::set<HwQubit>& hwQubits) {
   // two qubit gates
-  if (qubits.size() == 2) {
-    auto it = qubits.begin();
+  if (hwQubits.size() == 2) {
+    auto it = hwQubits.begin();
     auto q1 = *it;
     auto q2 = *(++it);
     return swapDistances(q1, q2);
   }
-  if (qubits.size() == 3) {
+  if (hwQubits.size() == 3) {
     // TODO substitute with special case taking into consideration the geometry
-    auto it = qubits.begin();
+    auto it = hwQubits.begin();
     auto q1 = *it;
     auto q2 = *(++it);
     auto q3 = *(++it);
     return swapDistances(q1, q2) + swapDistances(q2, q3) +
            swapDistances(q1, q3);
   }
-  // more than three qubits just minimize total distance
+  // more than three hwQubits just minimize total distance
   fp totalDistance = 0;
-  for (auto it1 = qubits.begin(); it1 != qubits.end(); ++it1) {
-    for (auto it2 = std::next(it1); it2 != qubits.end(); ++it2) {
+  for (auto it1 = hwQubits.begin(); it1 != hwQubits.end(); ++it1) {
+    for (auto it2 = std::next(it1); it2 != hwQubits.end(); ++it2) {
       totalDistance += swapDistances(*it1, *it2);
     }
   }
   return totalDistance;
 }
+
+std::set<HwQubit>
+HardwareQubits::getBlockedQubits(const std::vector<HwQubit>&        qubits,
+                                 const qc::NeutralAtomArchitecture& arch) {
+  std::set<HwQubit> blockedQubits;
+  for (const auto& qubit : qubits) {
+    for (uint32_t i = 0; i < swapDistances.getSize(); ++i) {
+      if (i == qubit) {
+        continue;
+      }
+      // do a preselection
+      if (swapDistances(qubit, i) < std::ceil(arch.getBlockingFactor())) {
+        // now check exact difference
+        auto const distance = arch.getEuclidianDistance(hwToCoordIdx.at(qubit),
+                                                        hwToCoordIdx.at(i));
+        if (distance < arch.getBlockingFactor() * arch.getInteractionRadius()) {
+          blockedQubits.insert(i);
+        }
+      }
+    }
+  }
+  return blockedQubits;
+}
+
 } // namespace qc

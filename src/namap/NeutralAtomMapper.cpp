@@ -27,9 +27,15 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   std::cout << "test" << std::endl;
 
   this->parameters.lookaheadWeight = 0.5;
+  this->parameters.decay           = 0.0;
   this->verbose                    = false;
 
   //   precompute all distances
+
+  this->decayWeights.reserve(this->arch.getNcolumns());
+  for (uint32_t i = 0; i < this->arch.getNcolumns(); ++i) {
+    this->decayWeights.push_back(std::exp(-this->parameters.decay * i));
+  }
 
   createFrontLayer();
   //  printLayers();
@@ -52,7 +58,6 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     while (gatesToExecute.empty()) {
       auto bestSwap = findBestSwap();
       updateMapping(bestSwap);
-      nSwaps++;
       gatesToExecute = getExecutableGates();
     }
     updateFrontLayerByGate(gatesToExecute);
@@ -453,6 +458,13 @@ GateList NeutralAtomMapper::getExecutableGates() {
 }
 
 void NeutralAtomMapper::updateMapping(qc::Swap swap) {
+  nSwaps++;
+  // save to lastSwaps
+  this->lastBlockedQubits.push_back(this->hardwareQubits.getBlockedQubits(
+      {swap.first, swap.second}, this->arch));
+  if (this->lastBlockedQubits.size() > this->arch.getNcolumns()) {
+    this->lastBlockedQubits.pop_front();
+  }
   this->mapping.swap(swap);
   this->mappedQc.swap(swap.first, swap.second);
   if (this->verbose) {
@@ -510,6 +522,19 @@ fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
                                  static_cast<fp>(this->lookaheadLayer.size());
   auto cost = parameters.lookaheadWeight * distanceChangeLookahead +
               distanceChangeFront;
+  //  compute the last time one of the swap qubits was used
+  if (this->parameters.decay != 0) {
+    uint32_t idxLastUsed = 0;
+    for (uint32_t i = 0; i < this->lastBlockedQubits.size(); ++i) {
+      if (this->lastBlockedQubits[i].find(swap.first) !=
+              this->lastBlockedQubits[i].end() ||
+          this->lastBlockedQubits[i].find(swap.second) !=
+              this->lastBlockedQubits[i].end()) {
+        idxLastUsed = i;
+      }
+    }
+    cost *= this->decayWeights[idxLastUsed];
+  }
   return cost;
 }
 

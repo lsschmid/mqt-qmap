@@ -18,6 +18,7 @@ class NeutralAtomMapper {
 protected:
   struct MapperParameters {
     fp lookaheadWeight = 0.1;
+    fp decay           = 0.1;
   };
 
   qc::NeutralAtomArchitecture                  arch;
@@ -34,6 +35,8 @@ protected:
   std::set<Qubit>                              lookaheadQubitsToUpdate;
   uint32_t                                     lookaheadDepth = 1;
   MapperParameters                             parameters;
+  std::deque<std::set<HwQubit>>                lastBlockedQubits;
+  std::vector<fp>                              decayWeights;
   uint32_t                                     nSwaps = 0;
 
   //  NeutralAtomMappingResults   results;
