@@ -6,12 +6,13 @@
     "nAods": 2,
     "nAodCoordinates": 2,
     "interQubitDistance": 0.574,
-    "interactionRadius": 2,
+    "interactionRadius": 1,
     "blockingFactor": 1
   },
   "parameters": {
-    "nQubits": 15,
+    "nQubits": 20,
     "gateTimes": {
+      "none": 0.5,
       "h": 0.5,
       "p": 0.001,
       "cx": 0.7,
@@ -19,6 +20,7 @@
       "mcx": 2.5
     },
     "gateAverageFidelities": {
+      "none": 0.999,
       "h": 0.999,
       "p": 0.999,
       "cx": 0.994,
