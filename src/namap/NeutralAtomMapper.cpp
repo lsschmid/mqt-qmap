@@ -28,7 +28,7 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
 
   this->parameters.lookaheadWeight = 0.5;
   this->parameters.decay           = 0.0;
-  this->verbose                    = false;
+  //  this->verbose                    = false;
 
   //   precompute all distances
 
@@ -410,10 +410,7 @@ bool qc::NeutralAtomMapper::isExecutable(
   for (auto qubit : usedQubits) {
     usedHwQubits.insert(this->mapping.getHwQubit(qubit));
   }
-  if (nUsedQubits == 2) {
-    return this->hardwareQubits.getTotalDistance(usedHwQubits) == 0;
-  }
-  return false;
+  return this->hardwareQubits.getTotalDistance(usedHwQubits) == 0;
 }
 
 void qc::NeutralAtomMapper::addToFrontLayer(
