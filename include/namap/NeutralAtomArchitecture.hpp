@@ -166,9 +166,16 @@ public:
   }
 
   [[nodiscard]] inline fp getGateTime(OpType opType) const {
+    if (parameters.gateTimes.find(opType) == parameters.gateTimes.end()) {
+      return parameters.gateTimes.at(OpType::None);
+    }
     return parameters.gateTimes.at(opType);
   }
   [[nodiscard]] inline fp getGateAverageFidelity(OpType opType) const {
+    if (parameters.gateAverageFidelities.find(opType) ==
+        parameters.gateAverageFidelities.end()) {
+      return parameters.gateAverageFidelities.at(OpType::None);
+    }
     return parameters.gateAverageFidelities.at(opType);
   }
   [[nodiscard]] inline fp getShuttlingTime(OpType shuttlingType) const {

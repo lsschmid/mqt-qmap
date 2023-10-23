@@ -4,9 +4,8 @@
 #pragma once
 
 #include "QuantumComputation.hpp"
+#include "namap/HardwareQubits.hpp"
 #include "namap/NeutralAtomArchitecture.hpp"
-#include "namap/NeutralAtomMapper.hpp"
-#include "namap/NeutralAtomUtils.hpp"
 
 namespace qc {
 
@@ -14,33 +13,28 @@ class NeutralAtomScheduler {
 protected:
   qc::NeutralAtomArchitecture arch;
   qc::HardwareQubits          hardwareQubits;
-  InitialMapping              mappingType;
-  qc::Mapping                 mapping;
   std::vector<fp>             totalExecutionTimes;
   fp                          totalIdleTime;
   fp                          totalFidelities;
 
-  // Methods
-
-  // temp`
-
 public:
-  // Getter
   [[nodiscard]] inline qc::NeutralAtomArchitecture getArchitecture() const {
     return arch;
   }
 
-  // Constructors
   NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch,
-                       qc::QuantumComputation& qc, InitialMapping mappingType,
                        InitialCoordinateMapping initialCoordinateMapping)
       : arch(arch), hardwareQubits(arch, initialCoordinateMapping),
-        mappingType(mappingType), mapping(arch.getNqubits(), mappingType),
-        totalExecutionTimes(std::vector<fp>(qc.getNqubits(), 0)),
+        totalExecutionTimes(std::vector<fp>(arch.getNqubits(), 0)),
         totalIdleTime(0), totalFidelities(1.0){};
 
-  // Methods
   void schedule(qc::QuantumComputation& qc, bool isBlockedForAll);
+
+  static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
+                                    fp totalIdleTime, fp totalFidelities);
+  static void printTotalExecutionTimes(std::vector<fp>& totalExectuionTimes);
+  static void printQubitsInfo(std::set<unsigned int> qubits,
+                              qc::HardwareQubits     hardwareQubits);
 };
 
 } // namespace qc

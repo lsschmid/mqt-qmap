@@ -97,7 +97,7 @@ public:
         hardwareQubits(arch, initialCoordinateMapping){};
 
   // Methods
-  void map(qc::QuantumComputation& qc);
+  QuantumComputation map(qc::QuantumComputation& qc);
 };
 
 } // namespace qc

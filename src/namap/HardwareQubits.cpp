@@ -91,7 +91,7 @@ fp HardwareQubits::getTotalDistance(std::set<HwQubit>& hwQubits) {
 }
 
 std::set<HwQubit>
-HardwareQubits::getBlockedQubits(const std::vector<HwQubit>&        qubits,
+HardwareQubits::getBlockedQubits(const std::set<HwQubit>&           qubits,
                                  const qc::NeutralAtomArchitecture& arch) {
   std::set<HwQubit> blockedQubits;
   for (const auto& qubit : qubits) {

@@ -7,128 +7,110 @@
 void qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc,
                                         bool isBlockedForAll) {
   std::cout << "\n* schedule start!" << std::endl;
-  // search the gates of the circuit in order
+
   int index = 0;
   for (auto& op : qc) {
+    std::cout << "\n" << index++ << std::endl;
+
+    auto   qubits = op->getUsedQubits();
     double opTime, opFidelity;
 
     // calculate time & fidelity
-    // TODO: make "shuttling" operation in the .QASM
-    auto qubits = op->getUsedQubits();
-
-    std::cout << "\n" << index++ << std::endl;
-    if (op->getType() != None) {
-      // gate
-      std::cout << op->getName() << "  ";
+    auto opType = op->getType();
+    if (opType == OpType::Move || opType == OpType::Activate ||
+        opType == OpType::Deactivate) { // shuttling
+      opTime     = arch.getShuttlingTime(op->getType());
+      opFidelity = arch.getShuttlingAverageFidelity(op->getType());
+    } else { // gate
       opTime     = arch.getGateTime(op->getType());
       opFidelity = arch.getGateAverageFidelity(op->getType());
-
-      // circuitQubit -> hardwareQubit -> coordinates
-      for (auto& qubit : qubits) {
-        // circuit qubits
-        std::cout << "q" << qubit << "{";
-        // hardware qubits
-        std::cout << mapping.getHwQubit(qubit) << "(";
-        // coordinate index
-        std::cout << hardwareQubits.getCoordIndex(mapping.getHwQubit(qubit))
-                  << ")}, ";
-      }
-      std::cout << std::endl;
-      std::cout << "-> time: " << opTime << ", fidelity: " << opFidelity
-                << std::endl;
-    } else {
-      // shuttling
-      /*
-      opTime     = arch.getShuttlingTime(
-          static_cast<ShuttlingType>(op->getShuttlingType()));
-      opFidelity = arch.getShuttlingAverageFidelity(
-          static_cast<ShuttlingType>(op->getShuttlingType()));
-      */
     }
 
-    // TODO: calculate the number of circuit qubits
-    // op->getBlockedQubits;
+    // DEBUG info
+    std::cout << op->getName() << "  ";
+    printQubitsInfo(qubits, hardwareQubits);
+    std::cout << "-> time: " << opTime << ", fidelity: " << opFidelity
+              << std::endl;
+
+    // getBlockedQubits;
+    std::set<unsigned int> blockedQubits;
+    if (qubits.size() == 1) {
+      blockedQubits.insert(*qubits.begin());
+    } else {
+      blockedQubits = hardwareQubits.getBlockedQubits(qubits, arch);
+    }
+    if (isBlockedForAll) {
+      for (uint32_t i = 0; i < arch.getNqubits(); i++) {
+        blockedQubits.insert(i);
+      }
+    }
+
+    /*
     std::set<unsigned int> blockedQubits = qubits;
-    if (op->getType() != None && qubits.size() != 1) {
-      for (auto q = 0; q < qc.getNqubits(); q++) {
-        auto qHardwareQubit = mapping.getHwQubit(q);
-        auto qCoordIndex    = hardwareQubits.getCoordIndex(qHardwareQubit);
-        for (auto& qubit : qubits) {
-          if (q == qubit) {
-            continue;
-          }
-          auto qubitHardwareQubit = mapping.getHwQubit(qubit);
-          auto qubitCoordIndex =
-              hardwareQubits.getCoordIndex(qubitHardwareQubit);
-          auto qubitDistance =
-              arch.getEuclidianDistance(qCoordIndex, qubitCoordIndex);
-          if (qubitDistance < arch.getInteractionRadius()) {
+    if(!arch.checkShuttlingType(op->getType()) && qubits.size()!=1){
+      for(auto q=0; q<arch.getNqubits(); q++){
+        auto qCoordIndex    = hardwareQubits.getCoordIndex(q);
+        for(auto& qubit : qubits){
+          if(q==qubit) continue;
+
+          auto qubitCoordIndex    = hardwareQubits.getCoordIndex(qubit);
+          auto qubitDistance      = arch.getEuclidianDistance(qCoordIndex,
+    qubitCoordIndex); if(qubitDistance < arch.getInteractionRadius()){
             blockedQubits.insert(q);
           }
         }
       }
-    } else if (op->getType() == None) {
-      // TODO: getBlockedQubits for Shuttling operations
-      if (!isBlockedForAll) {
-        // calculate row and col
-        for (auto& qubit : qubits) {
-          auto qHardwareQubit = mapping.getHwQubit(qubit);
-          auto qCoordIndex    = hardwareQubits.getCoordIndex(qHardwareQubit);
-          auto qCoord         = arch.getCoordinate(qCoordIndex).getXY();
-
-          // for all Rows
-          for (int i = 0; i < arch.getNcolumns(); i++) {
-            blockedQubits.insert(qCoord.first * arch.getNcolumns() + i);
-          }
-          // for all Columns
-          for (int i = 0; i < arch.getNrows(); i++) {
-            blockedQubits.insert(i * arch.getNcolumns() + qCoord.second);
-          }
-        }
-        // Move vs. Activate/Deactivate
-
-      } else {
-        for (auto i = 0; i < qc.getNqubits(); i++) {
-          blockedQubits.insert(i);
-        }
+    }
+    else if(arch.checkShuttlingType(op->getType()) && isBlockedForAll){
+      for(auto i=0; i<arch.getNqubits(); i++){
+        blockedQubits.insert(i);
       }
     }
+     */
     std::cout << "blockedQubits: ";
-    for (auto& qubit : blockedQubits) {
-      std::cout << qubit << ", ";
-    }
-    std::cout << std::endl;
+    printQubitsInfo(blockedQubits, hardwareQubits);
 
-    // find maxTime for blockedQubits
+    // update totalExecutionTimes & totalIdleTime & totalFidelities
     auto maxQubit = *std::max_element(
-        blockedQubits.begin(), blockedQubits.end(), [this](int a, int b) {
+        blockedQubits.begin(), blockedQubits.end(), [this](size_t a, size_t b) {
           return totalExecutionTimes[a] < totalExecutionTimes[b];
         });
-    fp maxTime = totalExecutionTimes[maxQubit];
+    fp const maxTime = totalExecutionTimes[maxQubit];
 
-    // update totalExecutionTimes & totalIdleTime
     for (auto qubit : blockedQubits) {
-      if (totalExecutionTimes[qubit] < maxTime) {
-        totalIdleTime += maxTime - totalExecutionTimes[qubit];
-      }
+      totalIdleTime += std::max(0.0, maxTime - totalExecutionTimes[qubit]);
       totalExecutionTimes[qubit] = maxTime + opTime;
     }
-    std::cout << "ExecutionTime: " << std::endl;
-    int i = 0;
-    for (auto qubit : totalExecutionTimes) {
-      std::cout << "[" << i << "] " << qubit << std::endl;
-      i++;
-    }
-
-    // update totalFidelities
     totalFidelities *= opFidelity;
+    printTotalExecutionTimes(totalExecutionTimes);
   }
+  printSchedulerResults(totalExecutionTimes, totalIdleTime, totalFidelities);
+}
 
-  // print the scheduler's results
-  auto maxIter =
-      std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
-  fp totalExecutionTime = *maxIter;
+void qc::NeutralAtomScheduler::printSchedulerResults(
+    std::vector<fp>& totalExecutionTimes, fp totalIdleTime,
+    fp totalFidelities) {
+  auto totalExecutionTime =
+      *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
   std::cout << "\ntotalExecutionTimes: " << totalExecutionTime << std::endl;
   std::cout << "totalIdleTime: " << totalIdleTime << std::endl;
   std::cout << "totalFidelities: " << totalFidelities << std::endl;
+}
+
+void qc::NeutralAtomScheduler::printTotalExecutionTimes(
+    std::vector<fp>& totalExecutionTimes) {
+  std::cout << "ExecutionTime: " << std::endl;
+  int i = 0;
+  for (auto qubit : totalExecutionTimes) {
+    std::cout << "[" << i++ << "] " << qubit << std::endl;
+  }
+}
+
+void qc::NeutralAtomScheduler::printQubitsInfo(
+    std::set<unsigned int> qubits, qc::HardwareQubits hardwareQubits) {
+  for (auto& qubit : qubits) {
+    std::cout << "q" << qubit << "{";
+    std::cout << hardwareQubits.getCoordIndex(qubit) << "}, ";
+  }
+  std::cout << std::endl;
 }

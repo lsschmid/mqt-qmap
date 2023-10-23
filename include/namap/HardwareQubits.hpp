@@ -57,7 +57,7 @@ public:
   std::vector<Swap>    getNearbySwaps(HwQubit q);
   std::vector<HwQubit> getNearbyQubits(HwQubit q);
   fp                   getTotalDistance(std::set<HwQubit>& qubits);
-  std::set<HwQubit>    getBlockedQubits(const std::vector<HwQubit>&    qubits,
+  std::set<HwQubit>    getBlockedQubits(const std::set<HwQubit>&       qubits,
                                         const NeutralAtomArchitecture& arch);
 };
 } // namespace qc

@@ -9,7 +9,7 @@
 #include "utils.hpp"
 
 namespace qc {
-void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
+QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   qc::CircuitOptimizer::removeFinalMeasurements(qc);
   this->dag     = qc::CircuitOptimizer::constructDAG(qc);
   this->mapping = Mapping(qc.getNqubits(), InitialMapping::Identity);
@@ -27,8 +27,8 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   std::cout << "test" << std::endl;
 
   this->parameters.lookaheadWeight = 0.5;
-  this->parameters.decay           = 0.0;
-  //  this->verbose                    = false;
+  this->parameters.decay           = 0.1;
+  this->verbose                    = false;
 
   //   precompute all distances
 
@@ -68,6 +68,7 @@ void qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     }
   }
   std::cout << "nSwaps: " << nSwaps << std::endl;
+  return this->mappedQc;
 }
 
 void qc::NeutralAtomMapper::createFrontLayer() {
@@ -528,6 +529,7 @@ fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
           this->lastBlockedQubits[i].find(swap.second) !=
               this->lastBlockedQubits[i].end()) {
         idxLastUsed = i;
+        break;
       }
     }
     cost *= this->decayWeights[idxLastUsed];

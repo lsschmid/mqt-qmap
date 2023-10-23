@@ -5,6 +5,7 @@
 #include "filesystem"
 #include "namap/NeutralAtomArchitecture.hpp"
 #include "namap/NeutralAtomMapper.hpp"
+#include "namap/NeutralAtomScheduler.hpp"
 
 #include "gtest/gtest.h"
 
@@ -31,10 +32,17 @@ TEST(NeutralAtomTest, mapper) {
   qc::NeutralAtomArchitecture arch = qc::NeutralAtomArchitecture(filename);
   qc::NeutralAtomMapper       mapper =
       qc::NeutralAtomMapper(arch, static_cast<qc::InitialCoordinateMapping>(0));
-  //  auto qc = qc::QuantumComputation("../../examples/3_17_13.qasm");
-  auto qc = qc::QuantumComputation("../../examples/qft_10.qasm");
+  //    auto qc =
+  //    qc::QuantumComputation("/Users/lude/Downloads/portfoliovqe_nativegates_ibm_qiskit_opt3_15.qasm");
+  //  auto qc = qc::QuantumComputation("../../examples/qft_10.qasm");
+  auto qc = qc::QuantumComputation("../../examples/qft_16.qasm");
+  //  auto qc = qc::QuantumComputation("../../examples/test.qasm");
 
-  mapper.map(qc);
+  auto qcMapped = mapper.map(qc);
+
+  qc::NeutralAtomScheduler scheduler = qc::NeutralAtomScheduler(
+      arch, static_cast<qc::InitialCoordinateMapping>(0));
+  scheduler.schedule(qcMapped, false);
 
   EXPECT_EQ(0, 0);
 }
