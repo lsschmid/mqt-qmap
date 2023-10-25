@@ -104,7 +104,8 @@ HardwareQubits::getBlockedQubits(const std::set<HwQubit>&           qubits,
         // now check exact difference
         auto const distance = arch.getEuclidianDistance(hwToCoordIdx.at(qubit),
                                                         hwToCoordIdx.at(i));
-        if (distance < arch.getBlockingFactor() * arch.getInteractionRadius()) {
+        if (distance <=
+            arch.getBlockingFactor() * arch.getInteractionRadius()) {
           blockedQubits.insert(i);
         }
       }
