@@ -27,13 +27,13 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   std::cout << "test" << std::endl;
 
   this->parameters.lookaheadWeight = 0.5;
-  this->parameters.decay           = 0.1;
+  this->parameters.decay           = 1;
   this->verbose                    = false;
 
   //   precompute all distances
 
   this->decayWeights.reserve(this->arch.getNcolumns());
-  for (uint32_t i = 0; i < this->arch.getNcolumns(); ++i) {
+  for (uint32_t i = this->arch.getNcolumns(); i > 0; --i) {
     this->decayWeights.push_back(std::exp(-this->parameters.decay * i));
   }
 
@@ -68,6 +68,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     }
   }
   std::cout << "nSwaps: " << nSwaps << std::endl;
+  qc::CircuitOptimizer::decomposeSWAP(this->mappedQc, false);
   return this->mappedQc;
 }
 
