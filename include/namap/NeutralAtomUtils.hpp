@@ -26,6 +26,13 @@ public:
     }
   }
 
+  SymmetricMatrix(uint32_t size, fp value) : size(size) {
+    data.resize(size);
+    for (uint32_t i = 0; i < size; ++i) {
+      data[i].resize(i + 1, value);
+    }
+  }
+
   inline fp& operator()(uint32_t row, uint32_t col) {
     if (row < col) {
       return data[col][row];
@@ -43,7 +50,7 @@ public:
   [[nodiscard]] inline uint32_t getSize() const { return size; }
 };
 
-enum InitialCoordinateMapping { Trivial };
+enum InitialCoordinateMapping { Trivial, Random };
 enum InitialMapping { Identity };
 
 } // namespace qc

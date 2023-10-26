@@ -43,6 +43,8 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   if (this->verbose) {
     printLayers();
   }
+
+  //  hardwareQubits.move(0, 15, arch);
   // probably need
   // updateFrontLayerByQubit(list with all qubits) to trigger commutation
 
@@ -487,7 +489,7 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   auto swaps = getAllPossibleSwaps();
   // evaluate swaps based on cost function
   std::vector<std::pair<Swap, fp>> swapCosts;
-  //  swapCosts.reserve(swaps.size());
+  swapCosts.reserve(swaps.size());
   for (const auto& swap : swaps) {
     swapCosts.emplace_back(swap, distanceCost(swap));
   }
@@ -496,6 +498,10 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
                                    [](const auto& swap1, const auto& swap2) {
                                      return swap1.second < swap2.second;
                                    });
+  // none of the swaps helps
+  if (bestSwap->second == 0) {
+    throw std::runtime_error("Qubit not reachable -> no swap helps");
+  }
   return bestSwap->first;
 }
 
@@ -539,7 +545,9 @@ fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
 }
 
 fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
-  fp distanceChange = 0;
+  fp distBefore = 0;
+  fp distAfter  = 0;
+  fp distChange = 0;
   for (const auto& gate : layer) {
     auto gateQubits = gate->get()->getUsedQubits();
 
@@ -549,7 +557,11 @@ fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
       gateHwQubits.insert(this->mapping.getHwQubit(qubit));
     }
     // distance before
-    distanceChange -= this->hardwareQubits.getTotalDistance(gateHwQubits);
+    distBefore = this->hardwareQubits.getTotalDistance(gateHwQubits);
+    if (distBefore == std::numeric_limits<fp>::infinity()) {
+      distChange += 0;
+      continue;
+    }
 
     // do swap
     auto firstInGate  = gateHwQubits.find((swap.first)) != gateHwQubits.end();
@@ -562,9 +574,10 @@ fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
       gateHwQubits.erase(swap.second);
     }
     // distance after
-    distanceChange += this->hardwareQubits.getTotalDistance(gateHwQubits);
+    distAfter = this->hardwareQubits.getTotalDistance(gateHwQubits);
+    distChange += distAfter - distBefore;
   }
-  return distanceChange;
+  return distChange;
 }
 
 } // namespace qc
