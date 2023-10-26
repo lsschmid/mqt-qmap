@@ -548,35 +548,60 @@ fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
   fp distBefore = 0;
   fp distAfter  = 0;
   fp distChange = 0;
+  // bring close only ontil swap distance =0, bring exact to the exact position
+  std::vector<std::pair<HwQubit, HwQubit>> swapCloseBy;
+  std::vector<std::pair<HwQubit, HwQubit>> moveExact;
   for (const auto& gate : layer) {
-    auto gateQubits = gate->get()->getUsedQubits();
-
-    // get hardware qubits
-    std::set<HwQubit> gateHwQubits;
-    for (const auto& qubit : gateQubits) {
-      gateHwQubits.insert(this->mapping.getHwQubit(qubit));
+    auto usedQubits = gate->get()->getUsedQubits();
+    if (usedQubits.size() == 2) {
+      swapCloseBy.emplace_back(this->mapping.getHwQubit(*usedQubits.begin()),
+                               this->mapping.getHwQubit(*usedQubits.rbegin()));
+    } else {
+      // TODO get list of origin -> target from optimal positions for multi
+      // qubit gates
+      throw std::runtime_error(
+          "Multi qubit gates distance not yet implemented");
     }
+  }
+  // bring qubits together to execute gate
+  for (const auto& [q1, q2] : swapCloseBy) {
     // distance before
-    distBefore = this->hardwareQubits.getTotalDistance(gateHwQubits);
+    distBefore = this->hardwareQubits.getSwapDistance(q1, q2);
     if (distBefore == std::numeric_limits<fp>::infinity()) {
-      distChange += 0;
       continue;
     }
-
     // do swap
-    auto firstInGate  = gateHwQubits.find((swap.first)) != gateHwQubits.end();
-    auto secondInGate = gateHwQubits.find((swap.second)) != gateHwQubits.end();
-    if (firstInGate && !secondInGate) {
-      gateHwQubits.insert(swap.second);
-      gateHwQubits.erase(swap.first);
-    } else if (!firstInGate && secondInGate) {
-      gateHwQubits.insert(swap.first);
-      gateHwQubits.erase(swap.second);
+    if (q1 == swap.first) {
+      distAfter = this->hardwareQubits.getSwapDistance(swap.second, q2);
+    } else if (q2 == swap.second) {
+      distAfter = this->hardwareQubits.getSwapDistance(q1, swap.first);
+    } else if (q1 == swap.second) {
+      distAfter = this->hardwareQubits.getSwapDistance(swap.first, q2);
+    } else if (q2 == swap.first) {
+      distAfter = this->hardwareQubits.getSwapDistance(q1, swap.second);
+    } else {
+      continue;
     }
-    // distance after
-    distAfter = this->hardwareQubits.getTotalDistance(gateHwQubits);
     distChange += distAfter - distBefore;
   }
+
+  // move qubits to the exact position for multi-qubit gates
+  for (const auto& [origin, destination] : moveExact) {
+    distBefore =
+        this->hardwareQubits.getSwapDistance(origin, destination, false);
+    if (distBefore == std::numeric_limits<fp>::infinity()) {
+      continue;
+    }
+    if (origin == swap.first) {
+      distAfter =
+          this->hardwareQubits.getSwapDistance(swap.second, destination, false);
+    } else if (origin == swap.second) {
+      distAfter =
+          this->hardwareQubits.getSwapDistance(swap.first, destination, false);
+    }
+    distChange += distAfter - distBefore;
+  }
+
   return distChange;
 }
 
