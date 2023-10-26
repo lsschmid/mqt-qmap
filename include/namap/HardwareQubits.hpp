@@ -54,11 +54,18 @@ public:
     initNearbyQubits(arch);
   }
 
-  [[nodiscard]] inline fp getSwapDistance(HwQubit q1, HwQubit q2) {
+  [[nodiscard]] inline fp getSwapDistance(HwQubit q1, HwQubit q2,
+                                          bool closeBy = true) {
+    if (q1 == q2) {
+      return 0;
+    }
     if (swapDistances(q1, q2) < 0) {
       computeSwapDistance(q1, q2);
     }
-    return swapDistances(q1, q2);
+    if (closeBy) {
+      return swapDistances(q1, q2);
+    }
+    return swapDistances(q1, q2) + 1;
   }
   [[nodiscard]] inline CoordIndex getCoordIndex(HwQubit qubit) const {
     return hwToCoordIdx.at(qubit);
