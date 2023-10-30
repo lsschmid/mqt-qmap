@@ -7,8 +7,7 @@
 #include "namap/Mapping.hpp"
 
 namespace qc {
-void HardwareQubits::initCompactSwapDistances(
-    const NeutralAtomArchitecture& arch) {
+void HardwareQubits::initCompactSwapDistances() {
   // only valid for trivial/compact initial layout
   swapDistances = SymmetricMatrix(arch.getNqubits());
   for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
@@ -19,7 +18,7 @@ void HardwareQubits::initCompactSwapDistances(
   }
 }
 
-void HardwareQubits::initNearbyQubits(const qc::NeutralAtomArchitecture& arch) {
+void HardwareQubits::initNearbyQubits() {
   for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
     computeNearbyQubits(i);
   }
@@ -71,14 +70,12 @@ void HardwareQubits::computeSwapDistance(HwQubit q1, HwQubit q2) {
   //  swapDistances(q1, q2) = static_cast<fp>(path.size() - 2);
 }
 
-void HardwareQubits::updateSwapDistances(
-    const qc::NeutralAtomArchitecture& arch, qc::HwQubit qubit) {
+void HardwareQubits::updateSwapDistances(qc::HwQubit qubit) {
   // reset swap distances
   swapDistances = SymmetricMatrix(arch.getNqubits(), -1);
 }
 
-void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord,
-                          NeutralAtomArchitecture& arch) {
+void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord) {
   if (newCoord >= arch.getNpositions()) {
     throw std::runtime_error("Invalid coordinate");
   }
@@ -106,14 +103,13 @@ void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord,
   }
 
   // update/reset swap distances
-  updateSwapDistances(arch, hwQubit);
+  updateSwapDistances(hwQubit);
 }
 
 std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
   std::vector<Swap> swaps;
-  auto              nearbyQubits = getNearbyQubits(q);
   swaps.reserve(nearbyQubits.size());
-  for (const auto& nearbyQubit : nearbyQubits) {
+  for (const auto& nearbyQubit : nearbyQubits.at(q)) {
     swaps.emplace_back(q, nearbyQubit);
   }
   return swaps;
@@ -163,8 +159,7 @@ fp HardwareQubits::getTotalDistance(std::set<HwQubit>& hwQubits) {
 }
 
 std::set<HwQubit>
-HardwareQubits::getBlockedQubits(const std::set<HwQubit>&           qubits,
-                                 const qc::NeutralAtomArchitecture& arch) {
+HardwareQubits::getBlockedQubits(const std::set<HwQubit>& qubits) {
   std::set<HwQubit> blockedQubits;
   for (const auto& qubit : qubits) {
     for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
@@ -181,6 +176,70 @@ HardwareQubits::getBlockedQubits(const std::set<HwQubit>&           qubits,
     }
   }
   return blockedQubits;
+}
+
+std::set<CoordIndex> HardwareQubits::getNearbyFreeCoordinates(HwQubit q) {
+  std::set<CoordIndex> nearbyFreeCoordinates;
+  for (auto const& coordIndex : this->getNearbyCoordinates(q)) {
+    if (!this->isMapped(coordIndex)) {
+      nearbyFreeCoordinates.insert(coordIndex);
+    }
+  }
+  return nearbyFreeCoordinates;
+}
+
+std::vector<CoordIndex>
+HardwareQubits::findClosestFreeCoord(qc::HwQubit           qubit,
+                                     MoveVector::Direction direction) {
+  // return the closest free coord in general
+  // and the closest free coord in the given direction
+  auto                    coord = getCoordIndex(qubit);
+  std::vector<CoordIndex> closestFreeCoords;
+  std::queue<CoordIndex>  queue;
+  queue.push(coord);
+  std::set<CoordIndex> visited;
+  visited.insert(coord);
+  bool foundClosest = false;
+  while (!queue.empty()) {
+    auto currentCoord = queue.front();
+    queue.pop();
+    auto nearbyCoords = this->arch.getNN(currentCoord);
+    for (const auto& nearbyCoord : nearbyCoords) {
+      if (std::find(visited.rbegin(), visited.rend(), nearbyCoord) ==
+          visited.rend()) {
+        visited.insert(nearbyCoord);
+        if (!this->isMapped(nearbyCoord)) {
+          if (!foundClosest) {
+            closestFreeCoords.push_back(nearbyCoord);
+          }
+          foundClosest = true;
+          if (direction == arch.getVector(coord, nearbyCoord).direction) {
+            closestFreeCoords.push_back(nearbyCoord);
+            return closestFreeCoords;
+          }
+        } else {
+          queue.push(nearbyCoord);
+        }
+      }
+    }
+  }
+  return closestFreeCoords;
+}
+
+fp HardwareQubits::getSwapDistanceMove(CoordIndex idx, HwQubit target) {
+  // checks for a move coord the swap distance to the target
+  auto nearbyCoords    = this->arch.getNN(idx);
+  fp   minSwapDistance = std::numeric_limits<fp>::infinity();
+  for (const auto& nearbyCoord : nearbyCoords) {
+    if (this->isMapped(nearbyCoord)) {
+      auto swapDistance =
+          this->getSwapDistance(target, this->getHwQubit(nearbyCoord));
+      if (swapDistance < minSwapDistance) {
+        minSwapDistance = swapDistance;
+      }
+    }
+  }
+  return minSwapDistance;
 }
 
 } // namespace qc

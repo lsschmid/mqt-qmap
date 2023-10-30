@@ -21,9 +21,9 @@ protected:
   SymmetricMatrix                         swapDistances;
   std::map<HwQubit, std::vector<HwQubit>> nearbyQubits;
 
-  void initCompactSwapDistances(const NeutralAtomArchitecture& arch);
-  void initNearbyQubits(const NeutralAtomArchitecture& arch);
-  void updateSwapDistances(const NeutralAtomArchitecture& arch, HwQubit qubit);
+  void initCompactSwapDistances();
+  void initNearbyQubits();
+  void updateSwapDistances(HwQubit qubit);
   void computeSwapDistance(HwQubit q1, HwQubit q2);
   void computeNearbyQubits(HwQubit qubit);
 
@@ -37,7 +37,7 @@ public:
       for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
         hwToCoordIdx.insert({i, i});
       }
-      initCompactSwapDistances(arch);
+      initCompactSwapDistances();
       break;
     case Random:
       std::vector<CoordIndex> indices(arch.getNpositions());
@@ -51,7 +51,7 @@ public:
 
       swapDistances = SymmetricMatrix(arch.getNqubits(), -1);
     }
-    initNearbyQubits(arch);
+    initNearbyQubits();
   }
 
   [[nodiscard]] inline fp getSwapDistance(HwQubit q1, HwQubit q2,
@@ -67,13 +67,22 @@ public:
     }
     return swapDistances(q1, q2) + 1;
   }
+  [[nodiscard]] fp getSwapDistanceMove(CoordIndex idx, HwQubit target);
   [[nodiscard]] inline CoordIndex getCoordIndex(HwQubit qubit) const {
     return hwToCoordIdx.at(qubit);
   }
-  [[nodiscard]] inline Qubit getQubit(CoordIndex coordIndex) const {
-    for (auto const& [qubit, index] : hwToCoordIdx) {
+  [[nodiscard]] inline std::set<CoordIndex>
+  getCoordIndices(std::set<HwQubit>& hwQubits) const {
+    std::set<CoordIndex> coordIndices;
+    for (auto const& hwQubit : hwQubits) {
+      coordIndices.insert(this->getCoordIndex(hwQubit));
+    }
+    return coordIndices;
+  }
+  [[nodiscard]] inline HwQubit getHwQubit(CoordIndex coordIndex) const {
+    for (auto const& [hwQubit, index] : hwToCoordIdx) {
       if (index == coordIndex) {
-        return qubit;
+        return hwQubit;
       }
     }
     throw std::runtime_error("There is no qubit at this coordinate " +
@@ -82,13 +91,23 @@ public:
   [[nodiscard]] inline std::vector<HwQubit> getNearbyQubits(HwQubit q) const {
     return nearbyQubits.at(q);
   }
+  [[nodiscard]] inline bool isMapped(CoordIndex idx) const {
+    return !std::none_of(
+        hwToCoordIdx.begin(), hwToCoordIdx.end(),
+        [idx](const auto& pair) { return pair.second == idx; });
+  }
+  [[nodiscard]] inline std::set<CoordIndex>
+  getNearbyCoordinates(HwQubit q) const {
+    return this->arch.getNearbyCoordinates(this->getCoordIndex(q));
+  }
 
-  void move(HwQubit hwQubit, CoordIndex newCoord,
-            NeutralAtomArchitecture& arch);
+  void move(HwQubit hwQubit, CoordIndex newCoord);
 
-  std::vector<Swap> getNearbySwaps(HwQubit q);
-  fp                getTotalDistance(std::set<HwQubit>& qubits);
-  std::set<HwQubit> getBlockedQubits(const std::set<HwQubit>&       qubits,
-                                     const NeutralAtomArchitecture& arch);
+  std::vector<Swap>       getNearbySwaps(HwQubit q);
+  std::set<CoordIndex>    getNearbyFreeCoordinates(HwQubit q);
+  fp                      getTotalDistance(std::set<HwQubit>& qubits);
+  std::set<HwQubit>       getBlockedQubits(const std::set<HwQubit>& qubits);
+  std::vector<CoordIndex> findClosestFreeCoord(HwQubit               qubit,
+                                               MoveVector::Direction direction);
 };
 } // namespace qc

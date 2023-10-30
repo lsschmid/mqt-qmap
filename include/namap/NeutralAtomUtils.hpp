@@ -53,4 +53,40 @@ public:
 enum InitialCoordinateMapping { Trivial, Random };
 enum InitialMapping { Identity };
 
+struct MoveVector {
+  struct Direction {
+    bool x;
+    bool y;
+
+    Direction(bool x, bool y) : x(x), y(y) {}
+    Direction(fp deltaX, fp deltaY) : x(deltaX >= 0), y(deltaY >= 0) {}
+
+    [[nodiscard]] inline bool operator==(const Direction& other) const {
+      return x == other.x && y == other.y;
+    }
+    [[nodiscard]] inline bool operator!=(const Direction& other) const {
+      return !(*this == other);
+    }
+  };
+
+  fp        xStart;
+  fp        yStart;
+  fp        xEnd;
+  fp        yEnd;
+  Direction direction;
+
+  MoveVector(fp xStart, fp yStart, fp xEnd, fp yEnd)
+      : xStart(xStart), yStart(yStart), xEnd(xEnd), yEnd(yEnd),
+        direction(xEnd - xStart, yEnd - yStart) {}
+
+  [[nodiscard]] inline bool sameDirection(const MoveVector& other) const {
+    return direction == other.direction;
+  }
+  [[nodiscard]] inline fp getLength() const {
+    return std::sqrt(std::pow(xEnd - xStart, 2) + std::pow(yEnd - yStart, 2));
+  }
+  [[nodiscard]] bool overlap(const MoveVector& other) const;
+  [[nodiscard]] bool include(const MoveVector& other) const;
+};
+
 } // namespace qc

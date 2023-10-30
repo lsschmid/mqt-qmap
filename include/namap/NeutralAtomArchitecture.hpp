@@ -5,6 +5,7 @@
 #pragma once
 
 #include "ShuttlingOperation.hpp"
+#include "namap/NeutralAtomDefinitions.hpp"
 #include "namap/NeutralAtomUtils.hpp"
 #include "utils.hpp"
 
@@ -23,18 +24,20 @@ class NeutralAtomArchitecture {
 
   public:
     Coordinate() = default;
-    Coordinate(std::uint32_t x, std::uint32_t y) : x(x), y(y) {}
+    Coordinate(CoordIndex x, CoordIndex y) : x(x), y(y) {}
 
-    [[nodiscard]] inline std::uint32_t getX() const { return x; }
-    [[nodiscard]] inline std::uint32_t getY() const { return y; }
-    [[nodiscard]] inline std::pair<std::uint32_t, std::uint32_t> getXY() const {
+    [[nodiscard]] inline CoordIndex getX() const { return x; }
+    [[nodiscard]] inline CoordIndex getY() const { return y; }
+    [[nodiscard]] inline fp getXfp() const { return static_cast<fp>(x); }
+    [[nodiscard]] inline fp getYfp() const { return static_cast<fp>(y); }
+    [[nodiscard]] inline std::pair<CoordIndex, CoordIndex> getXY() const {
       return std::make_pair(x, y);
     }
     [[nodiscard]] inline fp getEuclidianDistance(const Coordinate& c) const {
       return std::sqrt(std::pow(static_cast<fp>(x) - static_cast<fp>(c.x), 2) +
                        std::pow(static_cast<fp>(y) - static_cast<fp>(c.y), 2));
     }
-    [[nodiscard]] inline uint32_t
+    [[nodiscard]] inline CoordIndex
     getManhattenDistanceX(const Coordinate& c) const {
       if (x > c.x) {
         return x - c.x;
@@ -42,7 +45,7 @@ class NeutralAtomArchitecture {
         return c.x - x;
       }
     }
-    [[nodiscard]] inline uint32_t
+    [[nodiscard]] inline CoordIndex
     getManhattenDistanceY(const Coordinate& c) const {
       if (y > c.y) {
         return y - c.y;
@@ -91,7 +94,7 @@ class NeutralAtomArchitecture {
   };
 
   struct Parameters {
-    std::uint32_t        nQubits;
+    CoordIndex           nQubits;
     std::map<OpType, fp> gateTimes;
     std::map<OpType, fp> gateAverageFidelities;
     std::map<OpType, fp> shuttlingTimes;
@@ -112,13 +115,15 @@ class NeutralAtomArchitecture {
   };
 
 protected:
-  Properties              properties{};
-  Parameters              parameters;
-  std::vector<Coordinate> coordinates;
-  SymmetricMatrix         swapDistances;
+  Properties                        properties{};
+  Parameters                        parameters;
+  std::vector<Coordinate>           coordinates;
+  SymmetricMatrix                   swapDistances;
+  std::vector<std::set<CoordIndex>> nearbyCoordinates;
 
   void createCoordinates();
   void computeSwapDistances(fp interactionRadius);
+  void computeNearbyCoordinates();
 
 public:
   std::string name;
@@ -142,7 +147,7 @@ public:
   [[nodiscard]] inline std::uint16_t getNAodCoordinates() const {
     return properties.getNAodCoordinates();
   }
-  [[nodiscard]] inline std::uint32_t getNqubits() const {
+  [[nodiscard]] inline CoordIndex getNqubits() const {
     return parameters.nQubits;
   }
   [[nodiscard]] inline fp getInterQubitDistance() const {
@@ -155,8 +160,8 @@ public:
   [[nodiscard]] inline fp getBlockingFactor() const {
     return properties.getBlockingFactor();
   }
-  [[nodiscard]] inline fp getSwapDistance(std::uint32_t idx1,
-                                          std::uint32_t idx2) const {
+  [[nodiscard]] inline fp getSwapDistance(CoordIndex idx1,
+                                          CoordIndex idx2) const {
     return swapDistances(idx1, idx2);
   }
   [[nodiscard]] inline fp getSwapDistance(const Coordinate& c1,
@@ -192,18 +197,18 @@ public:
   [[nodiscard]] inline std::vector<Coordinate> getCoordinates() const {
     return coordinates;
   }
-  [[nodiscard]] inline Coordinate getCoordinate(std::uint32_t idx) const {
+  [[nodiscard]] inline Coordinate getCoordinate(CoordIndex idx) const {
     return coordinates[idx];
   }
 
-  [[nodiscard]] inline uint32_t getIndex(const Coordinate& c) {
+  [[nodiscard]] inline CoordIndex getIndex(const Coordinate& c) {
     return c.getX() + c.getY() * properties.getNcolumns();
   }
 
   void loadJson(const std::string& filename);
 
-  [[nodiscard]] inline fp getEuclidianDistance(std::uint32_t idx1,
-                                               std::uint32_t idx2) const {
+  [[nodiscard]] inline fp getEuclidianDistance(CoordIndex idx1,
+                                               CoordIndex idx2) const {
     return this->coordinates.at(idx1).getEuclidianDistance(
         this->coordinates.at(idx2));
   }
@@ -211,21 +216,37 @@ public:
                                                       const Coordinate& c2) {
     return c1.getEuclidianDistance(c2);
   }
-  [[nodiscard]] inline uint32_t
-  getManhattenDistanceX(std::uint32_t idx1, std::uint32_t idx2) const {
+  [[nodiscard]] inline CoordIndex getManhattenDistanceX(CoordIndex idx1,
+                                                        CoordIndex idx2) const {
     return this->coordinates.at(idx1).getManhattenDistanceX(
         this->coordinates.at(idx2));
   }
-  [[nodiscard]] inline uint32_t
-  getManhattenDistanceY(std::uint32_t idx1, std::uint32_t idx2) const {
+  [[nodiscard]] inline CoordIndex getManhattenDistanceY(CoordIndex idx1,
+                                                        CoordIndex idx2) const {
     return this->coordinates.at(idx1).getManhattenDistanceY(
         this->coordinates.at(idx2));
   }
-  [[nodiscard]] inline uint32_t getManhattenDistanceX(const Coordinate& c1) {
+  [[nodiscard]] inline CoordIndex getManhattenDistanceX(const Coordinate& c1) {
     return c1.getManhattenDistanceX(c1);
   }
-  [[nodiscard]] inline uint32_t getManhattenDistanceY(const Coordinate& c1) {
+  [[nodiscard]] inline CoordIndex getManhattenDistanceY(const Coordinate& c1) {
     return c1.getManhattenDistanceY(c1);
+  }
+
+  [[nodiscard]] inline std::set<CoordIndex>
+  getNearbyCoordinates(CoordIndex idx) const {
+    return nearbyCoordinates[idx];
+  }
+  [[nodiscard]] inline MoveVector getVector(CoordIndex idx1, CoordIndex idx2) {
+    return {this->coordinates[idx1].getXfp(), this->coordinates[idx1].getYfp(),
+            this->coordinates[idx2].getXfp(), this->coordinates[idx2].getYfp()};
+  }
+
+  [[nodiscard]] std::vector<CoordIndex> getNN(CoordIndex idx) const;
+
+  [[nodiscard]] inline fp getVectorShuttlingTime(const MoveVector& v) const {
+    return v.getLength() * this->getInterQubitDistance() /
+           this->getShuttlingTime(OpType::Move);
   }
 };
 

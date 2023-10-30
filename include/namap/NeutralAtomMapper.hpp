@@ -17,8 +17,11 @@ using GateList = std::set<std::unique_ptr<qc::Operation>*>;
 class NeutralAtomMapper {
 protected:
   struct MapperParameters {
-    fp lookaheadWeight = 0.1;
-    fp decay           = 0.1;
+    fp lookaheadWeightSwaps         = 0.1;
+    fp lookaheadWeightMoves         = 0.1;
+    fp decay                        = 0.1;
+    fp shuttlingTimeWeight          = 1;
+    fp shuttlingMakeExecutableBonus = 1;
   };
 
   qc::NeutralAtomArchitecture                  arch;
@@ -36,8 +39,10 @@ protected:
   uint32_t                                     lookaheadDepth = 1;
   MapperParameters                             parameters;
   std::deque<std::set<HwQubit>>                lastBlockedQubits;
+  std::deque<AtomMove>                         lastMoves;
   std::vector<fp>                              decayWeights;
   uint32_t                                     nSwaps = 0;
+  uint32_t                                     nMoves = 0;
 
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;
@@ -66,14 +71,24 @@ protected:
   void addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
 
   // Methods for mapping
-  Swap           findBestSwap();
-  GateList       getExecutableGates();
-  std::set<Swap> getAllPossibleSwaps();
-  void           updateMapping(Swap swap);
+  Swap               findBestSwap();
+  GateList           getExecutableGates();
+  std::set<Swap>     getAllPossibleSwaps();
+  AtomMove           findBestAtomMove();
+  std::set<MoveComb> getAllPossibleMoveCombinations();
+  std::set<MoveComb> getNearbyMoveCombinations(HwQubit start, HwQubit target);
+  std::set<MoveComb> getMoveAwayCombinations(HwQubit start, HwQubit target);
+
+  void updateMapping(Swap swap);
+  void updateMappingMove(AtomMove move);
 
   // Methods cost functions
   fp distanceCost(const Swap& swap);
   fp distancePerLayer(const Swap& swap, GateList& layer);
+  fp moveCost(const AtomMove& move);
+  fp moveCostComb(const MoveComb& moveComb);
+  fp moveDistancePerLayer(const AtomMove& move, GateList& layer);
+  fp parallelMoveCost(const AtomMove& move);
 
   // temp
   void printLayers();

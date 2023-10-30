@@ -33,13 +33,24 @@ public:
   [[nodiscard]] inline HwQubit getHwQubit(Qubit qubit) const {
     return circToHw.at(qubit);
   }
+
+  [[nodiscard]] inline std::set<HwQubit>
+  getHwQubits(std::set<Qubit>& qubits) const {
+    std::set<HwQubit> hwQubits;
+    for (const auto& qubit : qubits) {
+      hwQubits.insert(this->getHwQubit(qubit));
+    }
+    return hwQubits;
+  }
+
   [[nodiscard]] inline Qubit getCircQubit(HwQubit qubit) const {
     for (const auto& [circQubit, hwQubit] : circToHw) {
       if (hwQubit == qubit) {
         return circQubit;
       }
     }
-    throw std::runtime_error("Hardware qubit not mapped");
+    throw std::runtime_error("Hardware qubit: " + std::to_string(qubit) +
+                             " not found in mapping");
   }
 
   [[nodiscard]] inline bool isMapped(HwQubit qubit) const {

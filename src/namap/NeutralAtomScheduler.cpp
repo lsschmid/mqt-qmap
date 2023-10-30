@@ -37,7 +37,7 @@ void qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc,
     if (qubits.size() == 1) {
       blockedQubits.insert(*qubits.begin());
     } else {
-      blockedQubits = hardwareQubits.getBlockedQubits(qubits, arch);
+      blockedQubits = hardwareQubits.getBlockedQubits(qubits);
     }
     if (isBlockedForAll) {
       for (uint32_t i = 0; i < arch.getNqubits(); i++) {

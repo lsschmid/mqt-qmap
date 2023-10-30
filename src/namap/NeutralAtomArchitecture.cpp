@@ -74,6 +74,7 @@ void NeutralAtomArchitecture::loadJson(const std::string& filename) {
 
   this->createCoordinates();
   this->computeSwapDistances(this->properties.getInteractionRadius());
+  this->computeNearbyCoordinates();
 }
 void NeutralAtomArchitecture::createCoordinates() {
   for (std::uint16_t i = 0; i < this->properties.getNpositions(); i++) {
@@ -143,4 +144,38 @@ void NeutralAtomArchitecture::computeSwapDistances(fp interactionRadius) {
     }
   }
 }
+
+void NeutralAtomArchitecture::computeNearbyCoordinates() {
+  this->nearbyCoordinates = std::vector<std::set<CoordIndex>>(
+      this->getNpositions(), std::set<CoordIndex>());
+  for (CoordIndex coordIndex = 0; coordIndex < this->getNpositions();
+       coordIndex++) {
+    for (CoordIndex otherCoordIndex = 0; otherCoordIndex < coordIndex;
+         otherCoordIndex++) {
+      if (this->getSwapDistance(coordIndex, otherCoordIndex) == 0) {
+        this->nearbyCoordinates.at(coordIndex).insert(otherCoordIndex);
+        this->nearbyCoordinates.at(otherCoordIndex).insert(coordIndex);
+      }
+    }
+  }
+}
+
+std::vector<CoordIndex>
+NeutralAtomArchitecture::getNN(qc::CoordIndex idx) const {
+  std::vector<CoordIndex> nn;
+  if (idx % this->getNcolumns() != 0) {
+    nn.push_back(idx - 1);
+  }
+  if (idx % this->getNcolumns() != this->getNcolumns() - 1) {
+    nn.push_back(idx + 1);
+  }
+  if (idx >= this->getNcolumns()) {
+    nn.push_back(idx - this->getNcolumns());
+  }
+  if (idx < this->getNpositions() - this->getNcolumns()) {
+    nn.push_back(idx + this->getNcolumns());
+  }
+  return nn;
+}
+
 } // namespace qc
