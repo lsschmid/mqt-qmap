@@ -65,13 +65,15 @@ macro(ADD_NAMAP_LIBRARY libname srcfile)
     ${PROJECT_SOURCE_DIR}/include/${libname}/HardwareQubits.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/Mapping.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomDefinitions.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/AodScheduler.hpp
     namap/ShuttlingOperation.cpp
     namap/NeutralAtomMappingResults.cpp
     namap/NeutralAtomUtils.cpp
     namap/NeutralAtomScheduler.cpp
     namap/NeutralAtomArchitecture.cpp
     namap/HardwareQubits.cpp
-    namap/Mapping.cpp)
+    namap/Mapping.cpp
+    namap/AodScheduler.cpp)
 
   add_internal_library(${lib} ${srcfile})
 endmacro()
