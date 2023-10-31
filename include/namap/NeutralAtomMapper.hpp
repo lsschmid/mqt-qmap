@@ -6,6 +6,7 @@
 
 #include "NeutralAtomMappingResults.hpp"
 #include "QuantumComputation.hpp"
+#include "namap/AodScheduler.hpp"
 #include "namap/HardwareQubits.hpp"
 #include "namap/Mapping.hpp"
 #include "namap/NeutralAtomArchitecture.hpp"
@@ -108,7 +109,7 @@ public:
   // Constructors
   NeutralAtomMapper(const qc::NeutralAtomArchitecture& arch,
                     InitialCoordinateMapping           initialCoordinateMapping)
-      : arch(arch), mappedQc(arch.getNqubits()),
+      : arch(arch), mappedQc(arch.getNpositions()),
         hardwareQubits(arch, initialCoordinateMapping){};
 
   // Methods

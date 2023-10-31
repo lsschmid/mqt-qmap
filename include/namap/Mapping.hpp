@@ -13,7 +13,8 @@ namespace qc {
 // in a bijective manner
 class Mapping {
 protected:
-  std::map<Qubit, HwQubit> circToHw;
+  // std::map<Qubit, HwQubit>
+  Permutation circToHw;
 
 public:
   Mapping() = default;
@@ -57,6 +58,11 @@ public:
     return std::any_of(
         circToHw.begin(), circToHw.end(),
         [qubit](const auto& pair) { return pair.second == qubit; });
+  }
+
+  inline void mapToHwQubits(std::unique_ptr<Operation>* op) const {
+    (*op)->setTargets(circToHw.apply((*op)->getTargets()));
+    (*op)->setControls(circToHw.apply((*op)->getControls()));
   }
 
   void swap(Swap swap);

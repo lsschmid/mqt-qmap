@@ -78,7 +78,9 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   std::cout << "nSwaps: " << nSwaps << std::endl;
   std::cout << "nMoves: " << nMoves << std::endl;
   qc::CircuitOptimizer::decomposeSWAP(this->mappedQc, false);
-  return this->mappedQc;
+  AodScheduler scheduler(this->arch);
+  auto         scheduledQc = scheduler.schedule(this->mappedQc);
+  return scheduledQc;
 }
 
 void qc::NeutralAtomMapper::createFrontLayer() {
@@ -397,6 +399,9 @@ void qc::NeutralAtomMapper::mapGate(std::unique_ptr<qc::Operation>* op) {
   if (op->get()->getType() == qc::OpType::I) {
     return;
   }
+  // convert circuit qubits to CoordIndex and append to mappedQc
+  this->mapping.mapToHwQubits(op);
+  this->hardwareQubits.mapToCoordIdx(op);
   this->mappedQc.emplace_back((*op)->clone());
   if (this->verbose) {
     std::cout << "mapped " << (*op)->getName() << " ";
@@ -474,7 +479,12 @@ void NeutralAtomMapper::updateMapping(qc::Swap swap) {
     this->lastBlockedQubits.pop_front();
   }
   this->mapping.swap(swap);
-  this->mappedQc.swap(swap.first, swap.second);
+  // convert circuit qubits to CoordIndex and append to mappedQc
+  auto idxFirst =
+      this->hardwareQubits.getCoordIndex(this->mapping.getHwQubit(swap.first));
+  auto idxSecond =
+      this->hardwareQubits.getCoordIndex(this->mapping.getHwQubit(swap.second));
+  this->mappedQc.swap(idxFirst, idxSecond);
   if (this->verbose) {
     std::cout << "swapped " << swap.first << " " << swap.second;
     std::cout << "  logical qubits: ";
@@ -497,7 +507,8 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
   if (this->lastMoves.size() > this->arch.getNcolumns()) {
     this->lastMoves.pop_front();
   }
-  //  this->mappedQc.move(move.first, move.second);
+  mappedQc.move(move.first, move.second);
+  this->mappedQc.move(move.first, move.second);
   auto toMoveHwQubit = this->hardwareQubits.getHwQubit(move.first);
   this->hardwareQubits.move(toMoveHwQubit, move.second);
   if (verbose) {
@@ -734,8 +745,8 @@ fp NeutralAtomMapper::parallelMoveCost(const qc::AtomMove& move) {
   // check if move can use AOD atom from last moves
   if (std::find(lastEndingCoords.begin(), lastEndingCoords.end(), move.first) ==
       lastEndingCoords.end()) {
-    parallelCost += arch.getShuttlingTime(OpType::Activate) +
-                    arch.getShuttlingTime(OpType::Deactivate);
+    parallelCost += arch.getShuttlingTime(OpType::AodActivate) +
+                    arch.getShuttlingTime(OpType::AodDeactivate);
   }
   return parallelCost;
 }

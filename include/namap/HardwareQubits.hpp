@@ -16,8 +16,9 @@ namespace qc {
 class HardwareQubits {
 protected:
   //        std::map<Qubit, Qubit>      circToHw;
-  NeutralAtomArchitecture                 arch;
-  std::map<HwQubit, CoordIndex>           hwToCoordIdx;
+  NeutralAtomArchitecture arch;
+  //  std::map<HwQubit, CoordIndex>
+  Permutation                             hwToCoordIdx;
   SymmetricMatrix                         swapDistances;
   std::map<HwQubit, std::vector<HwQubit>> nearbyQubits;
 
@@ -99,6 +100,11 @@ public:
   [[nodiscard]] inline std::set<CoordIndex>
   getNearbyCoordinates(HwQubit q) const {
     return this->arch.getNearbyCoordinates(this->getCoordIndex(q));
+  }
+
+  inline void mapToCoordIdx(std::unique_ptr<Operation>* op) const {
+    (*op)->setTargets(hwToCoordIdx.apply((*op)->getTargets()));
+    (*op)->setControls(hwToCoordIdx.apply((*op)->getControls()));
   }
 
   void move(HwQubit hwQubit, CoordIndex newCoord);
