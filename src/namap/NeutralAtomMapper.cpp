@@ -480,10 +480,8 @@ void NeutralAtomMapper::updateMapping(qc::Swap swap) {
   }
   this->mapping.swap(swap);
   // convert circuit qubits to CoordIndex and append to mappedQc
-  auto idxFirst =
-      this->hardwareQubits.getCoordIndex(this->mapping.getHwQubit(swap.first));
-  auto idxSecond =
-      this->hardwareQubits.getCoordIndex(this->mapping.getHwQubit(swap.second));
+  auto idxFirst  = this->hardwareQubits.getCoordIndex(swap.first);
+  auto idxSecond = this->hardwareQubits.getCoordIndex(swap.second);
   this->mappedQc.swap(idxFirst, idxSecond);
   if (this->verbose) {
     std::cout << "swapped " << swap.first << " " << swap.second;
