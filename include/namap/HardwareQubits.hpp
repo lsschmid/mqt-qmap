@@ -18,13 +18,13 @@ protected:
   //        std::map<Qubit, Qubit>      circToHw;
   NeutralAtomArchitecture arch;
   //  std::map<HwQubit, CoordIndex>
-  Permutation                             hwToCoordIdx;
-  SymmetricMatrix                         swapDistances;
-  std::map<HwQubit, std::vector<HwQubit>> nearbyQubits;
+  Permutation                 hwToCoordIdx;
+  SymmetricMatrix             swapDistances;
+  std::map<HwQubit, HwQubits> nearbyQubits;
 
   void initCompactSwapDistances();
   void initNearbyQubits();
-  void updateSwapDistances(HwQubit qubit);
+  void updateSwapDistances();
   void computeSwapDistance(HwQubit q1, HwQubit q2);
   void computeNearbyQubits(HwQubit qubit);
 
@@ -89,7 +89,7 @@ public:
     throw std::runtime_error("There is no qubit at this coordinate " +
                              std::to_string(coordIndex));
   }
-  [[nodiscard]] inline std::vector<HwQubit> getNearbyQubits(HwQubit q) const {
+  [[nodiscard]] inline HwQubits getNearbyQubits(HwQubit q) const {
     return nearbyQubits.at(q);
   }
   [[nodiscard]] inline bool isMapped(CoordIndex idx) const {
@@ -108,6 +108,7 @@ public:
   }
 
   void move(HwQubit hwQubit, CoordIndex newCoord);
+  void swap(HwQubit q1, HwQubit q2);
 
   std::vector<Swap>       getNearbySwaps(HwQubit q);
   std::set<CoordIndex>    getNearbyFreeCoordinates(HwQubit q);

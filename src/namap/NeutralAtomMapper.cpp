@@ -32,7 +32,8 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   this->parameters.shuttlingTimeWeight  = 0;
   //  this->parameters.shuttlingMakeExecutableBonus = arch.getNcolumns();
   this->parameters.shuttlingMakeExecutableBonus = 1;
-  this->verbose                                 = false;
+  this->parameters.multiQubitGateWeight         = 1;
+  //    this->verbose                                 = false;
 
   //   precompute all distances
 
@@ -62,10 +63,10 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     }
     std::set<std::unique_ptr<Operation>*> gatesToExecute;
     while (gatesToExecute.empty()) {
-      //      auto bestSwap = findBestSwap();
-      //      updateMapping(bestSwap);
-      auto bestMove = findBestAtomMove();
-      updateMappingMove(bestMove);
+      auto bestSwap = findBestSwap();
+      updateMapping(bestSwap);
+      //      auto bestMove = findBestAtomMove();
+      //      updateMappingMove(bestMove);
       gatesToExecute = getExecutableGates();
     }
     updateFrontLayerByGate(gatesToExecute);
@@ -134,13 +135,18 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
         bool commutes = true;
         while (commutes && tempIter != this->dag[qubit].end()) {
           auto* nextOpPointer = *tempIter;
-          commutes            = commutesWith(this->frontLayer, nextOpPointer) &&
-                     commutesWith(this->frontCandidates[qubit], nextOpPointer);
+          commutes =
+              commutesWithAtQubit(this->frontLayer, nextOpPointer, qubit) &&
+              commutesWithAtQubit(this->frontCandidates[qubit], nextOpPointer,
+                                  qubit);
           if (commutes) {
             if (nextOpPointer->get()->getUsedQubits().size() == 1) {
               mapGate(nextOpPointer);
             } else { // not executable but commutes
-              this->frontCandidates[qubit].insert(nextOpPointer);
+              if (this->frontLayer.find(nextOpPointer) ==
+                  this->frontLayer.end()) {
+                this->frontCandidates[qubit].insert(nextOpPointer);
+              }
             }
             tempIter++;
           }
@@ -162,6 +168,7 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
       bool  inFrontLayer = true;
       auto* op           = opPointer->get();
       if (op->getType() == qc::OpType::I) {
+        toRemove.push_back(opPointer);
         continue;
       }
       for (const auto& opQubit : op->getUsedQubits()) {
@@ -220,83 +227,54 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
   }
 }
 
-bool qc::NeutralAtomMapper::commutesWith(
-    GateList& layer, std::unique_ptr<qc::Operation>* opPointer) {
+bool qc::NeutralAtomMapper::commutesWithAtQubit(
+    const qc::GateList& layer, const std::unique_ptr<qc::Operation>* opPointer,
+    const Qubit& qubit) {
   return std::all_of(layer.begin(), layer.end(),
-                     [&opPointer](const auto& frontOpPointer) {
-                       return commute(opPointer, frontOpPointer);
+                     [&opPointer, &qubit](const auto& frontOpPointer) {
+                       return commuteAtQubit(opPointer, frontOpPointer, qubit);
                      });
 }
 
-bool qc::NeutralAtomMapper::commute(
-    std::unique_ptr<qc::Operation>* opPointer1,
-    std::unique_ptr<qc::Operation>* opPointer2) {
+bool qc::NeutralAtomMapper::commuteAtQubit(
+    const std::unique_ptr<qc::Operation>* opPointer1,
+    const std::unique_ptr<qc::Operation>* opPointer2, const qc::Qubit& qubit) {
   auto* op1 = opPointer1->get();
   auto* op2 = opPointer2->get();
-
-  // gates acting of disjoint sets of qubits commute
-  auto usedQubits1 = op1->getUsedQubits();
-  auto usedQubits2 = op2->getUsedQubits();
-  if (std::all_of(usedQubits1.begin(), usedQubits1.end(),
-                  [&usedQubits2](const auto& qubit) {
-                    return std::find(usedQubits2.begin(), usedQubits2.end(),
-                                     qubit) == usedQubits2.end();
-                  })) {
-    return true;
-  }
 
   // single qubit gates commute
   if (op1->getUsedQubits().size() == 1 && op2->getUsedQubits().size() == 1) {
     return true;
   }
 
-  // if targets are same, it commutes for same type
-  if (op1->getTargets() == op2->getTargets() &&
-      op1->getType() == op2->getType()) {
+  if (op1->getType() == qc::OpType::I || op2->getType() == qc::OpType::I) {
     return true;
   }
 
-  // if controls act on same qubits, it commutes
-  auto controls1 = op1->getControls();
-  auto controls2 = op2->getControls();
-  if (!controls1.empty() && !controls2.empty()) {
-    if (std::all_of(controls1.begin(), controls1.end(),
-                    [&controls2](const auto& control1) {
-                      return std::any_of(controls2.begin(), controls2.end(),
-                                         [&control1](const auto& control2) {
-                                           return control1.qubit ==
-                                                  control2.qubit;
-                                         });
-                    })) {
-      return true;
-    }
-  }
-
-  // control and single qubit z-rz commutes
-
-  if (commuteSingleQubitZAndControl(opPointer1, opPointer2) ||
-      commuteSingleQubitZAndControl(opPointer2, opPointer1)) {
+  // commutes at qubit if at least one of the two gates does not use qubit
+  auto usedQubits1 = op1->getUsedQubits();
+  auto usedQubits2 = op2->getUsedQubits();
+  if (std::find(usedQubits1.begin(), usedQubits1.end(), qubit) ==
+          usedQubits1.end() ||
+      std::find(usedQubits2.begin(), usedQubits2.end(), qubit) ==
+          usedQubits2.end()) {
     return true;
   }
-  return false;
-}
 
-bool qc::NeutralAtomMapper::commuteSingleQubitZAndControl(
-    std::unique_ptr<qc::Operation>* opPointer1,
-    std::unique_ptr<qc::Operation>* opPointer2) {
-  auto* op1 = opPointer1->get();
-  auto* op2 = opPointer2->get();
-  if (op1->getType() == qc::OpType::Z || op1->getType() == qc::OpType::RZ) {
-    if (op1->getControls().empty()) {
-      auto op1Target   = op1->getTargets().front();
-      auto op2Controls = op2->getControls();
-      if (std::any_of(op2Controls.begin(), op2Controls.end(),
-                      [&op1Target](const auto& control) {
-                        return op1Target == control.qubit;
-                      })) {
-        return true;
-      }
-    }
+  // for two-qubit gates, check if they commute at qubit
+  // commute if both are controlled at qubit or operation on qubit is same
+  // check controlles
+  if (op1->getControls().find(qubit) != op1->getControls().end() &&
+      op2->getControls().find(qubit) != op2->getControls().end()) {
+    return true;
+  }
+  // check targets
+  if (std::find(op1->getTargets().begin(), op1->getTargets().end(), qubit) !=
+          op1->getTargets().end() &&
+      (std::find(op2->getTargets().begin(), op2->getTargets().end(), qubit) !=
+       op2->getTargets().end()) &&
+      (op1->getType() == op2->getType())) {
+    return true;
   }
   return false;
 }
@@ -379,7 +357,7 @@ void qc::NeutralAtomMapper::findLookaheadCandidates() {
         while (commutes && lookaheadIter != this->dag[qubit].end()) {
           auto* nextOpPointer = *lookaheadIter;
           auto* nextOp        = nextOpPointer->get();
-          commutes            = commute(opPointer, nextOpPointer);
+          commutes            = commuteAtQubit(opPointer, nextOpPointer, qubit);
           if (commutes) {
             lookaheadIter++;
             if (nextOp->getUsedQubits().size() > 1) {
@@ -399,10 +377,6 @@ void qc::NeutralAtomMapper::mapGate(std::unique_ptr<qc::Operation>* op) {
   if (op->get()->getType() == qc::OpType::I) {
     return;
   }
-  // convert circuit qubits to CoordIndex and append to mappedQc
-  this->mapping.mapToHwQubits(op);
-  this->hardwareQubits.mapToCoordIdx(op);
-  this->mappedQc.emplace_back((*op)->clone());
   if (this->verbose) {
     std::cout << "mapped " << (*op)->getName() << " ";
     for (auto qubit : (*op)->getUsedQubits()) {
@@ -410,6 +384,11 @@ void qc::NeutralAtomMapper::mapGate(std::unique_ptr<qc::Operation>* op) {
     }
     std::cout << "\n";
   }
+  // convert circuit qubits to CoordIndex and append to mappedQc
+  auto opClone = (*op)->clone();
+  this->mapping.mapToHwQubits(&opClone);
+  this->hardwareQubits.mapToCoordIdx(&opClone);
+  this->mappedQc.emplace_back(opClone);
 
   op->get()->setGate(qc::OpType::I);
 }
@@ -436,6 +415,8 @@ void qc::NeutralAtomMapper::addToFrontLayer(
   if (this->lookaheadLayer.find(opPointer) != this->lookaheadLayer.end()) {
     this->lookaheadLayer.erase(opPointer);
   }
+  // remove from front candidates not allowed here
+  // to prevent modify while iterating
 }
 
 void qc::NeutralAtomMapper::printLayers() {
@@ -518,8 +499,14 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
 }
 
 qc::Swap qc::NeutralAtomMapper::findBestSwap() {
-  auto swaps = getAllPossibleSwaps();
+  // compute necessary movements
+  initSwapAndMove(this->frontLayer, this->swapCloseByFront,
+                  this->moveExactFront);
+  initSwapAndMove(this->lookaheadLayer, this->swapCloseByLookahead,
+                  this->moveExactLookahead);
+
   // evaluate swaps based on cost function
+  auto                             swaps = getAllPossibleSwaps();
   std::vector<std::pair<Swap, fp>> swapCosts;
   swapCosts.reserve(swaps.size());
   for (const auto& swap : swaps) {
@@ -553,10 +540,15 @@ std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
 
 fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
   // compute the change in total distance
-  auto distanceChangeFront = distancePerLayer(swap, this->frontLayer) /
-                             static_cast<fp>(this->frontLayer.size());
-  auto distanceChangeLookahead = distancePerLayer(swap, this->lookaheadLayer) /
-                                 static_cast<fp>(this->lookaheadLayer.size());
+  auto distanceChangeFront =
+      distancePerLayer(swap, this->swapCloseByFront, this->moveExactFront) /
+      static_cast<fp>(this->frontLayer.size());
+  fp distanceChangeLookahead = 0;
+  if (!this->lookaheadLayer.empty()) {
+    distanceChangeLookahead = distancePerLayer(swap, this->swapCloseByLookahead,
+                                               this->moveExactLookahead) /
+                              static_cast<fp>(this->lookaheadLayer.size());
+  }
   auto cost = parameters.lookaheadWeightSwaps * distanceChangeLookahead +
               distanceChangeFront;
   //  compute the last time one of the swap qubits was used
@@ -576,25 +568,38 @@ fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
   return cost;
 }
 
-fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
+void NeutralAtomMapper::initSwapAndMove(
+    const qc::GateList& layer, std::vector<SwapOrMove>& swapCloseBy,
+    std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
+  swapCloseBy.clear();
+  moveExact.clear();
+  for (const auto& gate : layer) {
+    auto usedQubits   = gate->get()->getUsedQubits();
+    auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
+    if (usedQubits.size() == 2) {
+      swapCloseBy.emplace_back(*usedHwQubits.begin(), *usedHwQubits.rbegin());
+    } else {
+      auto bestPos = getBestMultiQubitPosition(usedHwQubits);
+      if (verbose) {
+        std::cout << "bestPos: ";
+        for (auto qubit : bestPos) {
+          std::cout << qubit << " ";
+        }
+        std::cout << std::endl;
+      }
+      auto exactMoves = getExactMoveToPosition(usedHwQubits, bestPos);
+      moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
+    }
+  }
+}
+
+fp NeutralAtomMapper::distancePerLayer(
+    const qc::Swap& swap, const std::vector<SwapOrMove>& swapCloseBy,
+    const std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
   fp distBefore = 0;
   fp distAfter  = 0;
   fp distChange = 0;
   // bring close only ontil swap distance =0, bring exact to the exact position
-  std::vector<std::pair<HwQubit, HwQubit>> swapCloseBy;
-  std::vector<std::pair<HwQubit, HwQubit>> moveExact;
-  for (const auto& gate : layer) {
-    auto usedQubits = gate->get()->getUsedQubits();
-    if (usedQubits.size() == 2) {
-      swapCloseBy.emplace_back(this->mapping.getHwQubit(*usedQubits.begin()),
-                               this->mapping.getHwQubit(*usedQubits.rbegin()));
-    } else {
-      // TODO get list of origin -> target from optimal positions for multi
-      // qubit gates
-      throw std::runtime_error(
-          "Multi qubit gates distance not yet implemented");
-    }
-  }
   // bring qubits together to execute gate
   for (const auto& [q1, q2] : swapCloseBy) {
     // distance before
@@ -618,7 +623,11 @@ fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
   }
 
   // move qubits to the exact position for multi-qubit gates
-  for (const auto& [origin, destination] : moveExact) {
+  for (const auto& moveWithCost : moveExact) {
+    auto move        = moveWithCost.first;
+    auto origin      = move.first;
+    auto destination = move.second;
+    auto cost        = moveWithCost.second;
     distBefore =
         this->hardwareQubits.getSwapDistance(origin, destination, false);
     if (distBefore == std::numeric_limits<fp>::infinity()) {
@@ -630,11 +639,206 @@ fp NeutralAtomMapper::distancePerLayer(const qc::Swap& swap, GateList& layer) {
     } else if (origin == swap.second) {
       distAfter =
           this->hardwareQubits.getSwapDistance(swap.first, destination, false);
+    } else {
+      continue;
     }
-    distChange += distAfter - distBefore;
+    distChange +=
+        (distAfter - distBefore) / cost * parameters.multiQubitGateWeight;
   }
 
   return distChange;
+}
+
+HwQubits
+NeutralAtomMapper::getBestMultiQubitPosition(qc::HwQubits& gateQubits) {
+  // try to find position around gate Qubits recursively
+  // if not, search through coupling graph until found according to a
+  // priority queue based on the distance to the other qubits
+  std::priority_queue<std::pair<fp, HwQubit>,
+                      std::vector<std::pair<fp, HwQubit>>,
+                      std::greater<std::pair<fp, HwQubit>>>
+      qubitQueue;
+  // add the gate qubits to the priority queue
+  for (const auto& gateQubit : gateQubits) {
+    fp totalDist = 0;
+    for (const auto& otherGateQubit : gateQubits) {
+      if (gateQubit == otherGateQubit) {
+        continue;
+      }
+      totalDist += this->hardwareQubits.getSwapDistance(gateQubit,
+                                                        otherGateQubit, false);
+    }
+    qubitQueue.emplace(totalDist, gateQubit);
+  }
+
+  // run through the priority queue until a position is found
+  std::set<HwQubit> visitedQubits;
+  while (!qubitQueue.empty()) {
+    auto qubit = qubitQueue.top().second;
+    visitedQubits.insert(qubit);
+    qubitQueue.pop();
+
+    auto bestPos = getBestMultiQubitPositionRec(
+        gateQubits, {qubit}, this->hardwareQubits.getNearbyQubits(qubit));
+    if (!bestPos.empty()) {
+      return bestPos;
+    }
+    // add nearby qubits to the priority queue
+    for (const auto& nearbyQubit :
+         this->hardwareQubits.getNearbyQubits(qubit)) {
+      if (visitedQubits.find(nearbyQubit) != visitedQubits.end()) {
+        continue;
+      }
+      // compute total distance to all other gate qubits
+      fp totalDist = 0;
+      for (const auto& otherGateQubit : gateQubits) {
+        if (nearbyQubit == otherGateQubit) {
+          continue;
+        }
+        totalDist +=
+            this->hardwareQubits.getSwapDistance(nearbyQubit, otherGateQubit);
+      }
+      qubitQueue.emplace(totalDist, nearbyQubit);
+    }
+  }
+  throw std::runtime_error(
+      "No possible gate based move found for multi qubit "
+      "gate. Try with shuttling, or check interaction radius.");
+}
+
+HwQubits
+NeutralAtomMapper::getBestMultiQubitPositionRec(const qc::HwQubits& gateQubits,
+                                                qc::Qubits selectedQubits,
+                                                qc::Qubits remainingQubits) {
+  // if not enough space
+  if (selectedQubits.size() + remainingQubits.size() < gateQubits.size()) {
+    return {};
+  }
+
+  std::vector<std::pair<HwQubit, fp>> summedDistances;
+  for (const auto& hwQubit : remainingQubits) {
+    fp distance = 0;
+    for (const auto& gateHwQubit : gateQubits) {
+      distance +=
+          this->hardwareQubits.getSwapDistance(hwQubit, gateHwQubit, false);
+    }
+    summedDistances.emplace_back(hwQubit, distance);
+  }
+  // select next qubit as the one with minimal distance
+  auto nextQubitDist =
+      std::min_element(summedDistances.begin(), summedDistances.end(),
+                       [](const auto& qubit1, const auto& qubit2) {
+                         return qubit1.second < qubit2.second;
+                       });
+  auto nextQubit = nextQubitDist->first;
+  selectedQubits.insert(nextQubit);
+  // done if already sufficient number of qubits
+  if (selectedQubits.size() == gateQubits.size()) {
+    return selectedQubits;
+  }
+  auto nearbyNextQubit = this->hardwareQubits.getNearbyQubits(nextQubit);
+  // compute remaining qubits as the intersection with current
+  Qubits newRemainingQubits;
+  std::set_intersection(
+      remainingQubits.begin(), remainingQubits.end(), nearbyNextQubit.begin(),
+      nearbyNextQubit.end(),
+      std::inserter(newRemainingQubits, newRemainingQubits.begin()));
+  return getBestMultiQubitPositionRec(gateQubits, selectedQubits,
+                                      newRemainingQubits);
+}
+
+std::vector<std::pair<SwapOrMove, fp>>
+NeutralAtomMapper::getExactMoveToPosition(HwQubits gateQubits,
+                                          HwQubits position) {
+  std::vector<std::pair<SwapOrMove, fp>> exactMoves;
+  while (!position.empty()) {
+    std::vector<std::tuple<HwQubit, std::set<HwQubit>, fp>> minimalDistances;
+    std::set<HwQubit> minimalDistancePosQubit;
+    for (const auto& gateQubit : gateQubits) {
+      fp minimalDistance = std::numeric_limits<fp>::infinity();
+      for (const auto& posQubit : position) {
+        auto distance =
+            this->hardwareQubits.getSwapDistance(gateQubit, posQubit, false);
+        if (distance < minimalDistance) {
+          minimalDistance = distance;
+          minimalDistancePosQubit.clear();
+          minimalDistancePosQubit.insert(posQubit);
+        } else if (distance == minimalDistance) {
+          minimalDistancePosQubit.insert(posQubit);
+        }
+      }
+      if (minimalDistance == std::numeric_limits<fp>::infinity()) {
+        throw std::runtime_error(
+            "No possible gate based move found for multi qubit gate.");
+        // TODO maybe mark gate to be executed with shuttling
+      }
+      minimalDistances.emplace_back(gateQubit, minimalDistancePosQubit,
+                                    minimalDistance);
+    }
+    // find gate qubit with maximal minimal distance to assign first to a
+    // position
+    auto assignFirst =
+        std::max_element(minimalDistances.begin(), minimalDistances.end(),
+                         [](const auto& qubit1, const auto& qubit2) {
+                           return std::get<2>(qubit1) < std::get<2>(qubit2);
+                         });
+
+    auto assignedGateQubit = std::get<0>(*assignFirst);
+    auto assignedPosQubits = std::get<1>(*assignFirst);
+    // for multiple equal good posiitons, choose the one that
+    // is not assigned to one of the other ones
+    HwQubit assignedPosQubit = *assignedPosQubits.begin();
+    if (assignedPosQubits.size() > 1) {
+      for (const auto& posQubit : assignedPosQubits) {
+        // as all places within the position can reach each other, it is
+        // sufficient to check for a single unoccupied position
+        // check if posQubit is assigned at its current position
+        if (std::none_of(minimalDistances.begin(), minimalDistances.end(),
+                         [&posQubit](const auto& qubit) {
+                           return std::get<0>(qubit) == posQubit &&
+                                  *(std::get<1>(qubit).begin()) == posQubit;
+                         })) {
+          assignedPosQubit = posQubit;
+          break;
+        }
+      }
+    }
+
+    // assign gateQubit to position by removing both from gateQubits and
+    // position
+    gateQubits.erase(gateQubits.find(assignedGateQubit));
+    position.erase(position.find(assignedPosQubit));
+    // and add to exactMove if not swap with one of the other qubits
+    // only problem if their exact swap distance is 1
+    if (std::none_of(gateQubits.begin(), gateQubits.end(),
+                     [&assignedGateQubit, this](const auto& qubit) {
+                       return assignedGateQubit == qubit &&
+                              this->hardwareQubits.getSwapDistance(
+                                  assignedGateQubit, qubit, false) == 1;
+                     }) &&
+        assignedGateQubit != assignedPosQubit) {
+      exactMoves.emplace_back(
+          std::make_pair(assignedGateQubit, assignedPosQubit), 0);
+    }
+  }
+
+  // compute total distance of all moves
+  fp totalDistance = 0;
+  for (const auto& [move, cost] : exactMoves) {
+    auto [q1, q2] = move;
+    totalDistance += this->hardwareQubits.getSwapDistance(q1, q2, false);
+  }
+  // add cost to the moves -> move first qubit corresponding to almost finished
+  // positions
+  for (auto& move : exactMoves) {
+    // TODO maybe add distance here also to cost -> qubits that are far of
+    // are more likely to be moved first
+    move.second =
+        totalDistance; //- this->hardwareQubits.getSwapDistance(move.first,
+                       // move.second, false);
+  }
+
+  return exactMoves;
 }
 
 AtomMove NeutralAtomMapper::findBestAtomMove() {

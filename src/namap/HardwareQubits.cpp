@@ -70,7 +70,7 @@ void HardwareQubits::computeSwapDistance(HwQubit q1, HwQubit q2) {
   //  swapDistances(q1, q2) = static_cast<fp>(path.size() - 2);
 }
 
-void HardwareQubits::updateSwapDistances(qc::HwQubit qubit) {
+void HardwareQubits::updateSwapDistances() {
   // reset swap distances
   swapDistances = SymmetricMatrix(arch.getNqubits(), -1);
 }
@@ -99,11 +99,11 @@ void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord) {
   // add qubit to new nearby qubits
   auto newNearbyQubits = nearbyQubits.at(hwQubit);
   for (const auto& qubit : newNearbyQubits) {
-    nearbyQubits.at(qubit).emplace_back(hwQubit);
+    nearbyQubits.at(qubit).insert(hwQubit);
   }
 
   // update/reset swap distances
-  updateSwapDistances(hwQubit);
+  updateSwapDistances();
 }
 
 std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
@@ -116,15 +116,15 @@ std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
 }
 
 void HardwareQubits::computeNearbyQubits(qc::HwQubit q) {
-  std::vector<HwQubit> newNearbyQubits;
-  auto                 coordQ = hwToCoordIdx.at(q);
+  std::set<HwQubit> newNearbyQubits;
+  auto              coordQ = hwToCoordIdx.at(q);
   for (const auto& coord : hwToCoordIdx) {
     if (coord.first == q) {
       continue;
     }
     if (arch.getEuclidianDistance(coordQ, coord.second) <=
         arch.getInteractionRadius()) {
-      newNearbyQubits.emplace_back(coord.first);
+      newNearbyQubits.insert(coord.first);
     }
   }
   nearbyQubits.insert_or_assign(q, newNearbyQubits);
@@ -138,17 +138,7 @@ fp HardwareQubits::getTotalDistance(std::set<HwQubit>& hwQubits) {
     auto q2 = *(++it);
     return getSwapDistance(q1, q2);
   }
-  if (hwQubits.size() == 3) {
-    // TODO substitute with special case taking into consideration the
-    // geometry
-    auto it = hwQubits.begin();
-    auto q1 = *it;
-    auto q2 = *(++it);
-    auto q3 = *(++it);
-    return getSwapDistance(q1, q2) + getSwapDistance(q2, q3) +
-           getSwapDistance(q1, q3);
-  }
-  // more than three hwQubits just minimize total distance
+  // for n > 2 all qubits need to be within the interaction radius of each other
   fp totalDistance = 0;
   for (auto it1 = hwQubits.begin(); it1 != hwQubits.end(); ++it1) {
     for (auto it2 = std::next(it1); it2 != hwQubits.end(); ++it2) {

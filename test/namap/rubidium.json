@@ -6,7 +6,7 @@
     "nAods": 2,
     "nAodCoordinates": 2,
     "interQubitDistance": 0.574,
-    "interactionRadius": 1,
+    "interactionRadius": 1.5,
     "blockingFactor": 1
   },
   "parameters": {
@@ -33,13 +33,15 @@
     },
     "shuttlingTimes": {
       "move": 0.55,
-      "activate": 40,
-      "deactivate": 40
+      "aod_move": 0.55,
+      "aod_activate": 40,
+      "aod_deactivate": 40
     },
     "shuttlingAverageFidelities": {
       "move": 1,
-      "activate": 1,
-      "deactivate": 1
+      "aod_move": 1,
+      "aod_activate": 1,
+      "aod_deactivate": 1
     }
   }
 }
