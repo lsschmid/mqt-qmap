@@ -63,10 +63,10 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     }
     std::set<std::unique_ptr<Operation>*> gatesToExecute;
     while (gatesToExecute.empty()) {
-      auto bestSwap = findBestSwap();
-      updateMapping(bestSwap);
-      //      auto bestMove = findBestAtomMove();
-      //      updateMappingMove(bestMove);
+      //      auto bestSwap = findBestSwap();
+      //      updateMapping(bestSwap);
+      auto bestMove = findBestAtomMove();
+      updateMappingMove(bestMove);
       gatesToExecute = getExecutableGates();
     }
     updateFrontLayerByGate(gatesToExecute);
@@ -487,13 +487,16 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
     this->lastMoves.pop_front();
   }
   mappedQc.move(move.first, move.second);
-  this->mappedQc.move(move.first, move.second);
   auto toMoveHwQubit = this->hardwareQubits.getHwQubit(move.first);
   this->hardwareQubits.move(toMoveHwQubit, move.second);
   if (verbose) {
-    std::cout << "moved " << move.first << " to " << move.second << " HwQubit "
-              << toMoveHwQubit << " CircQubit "
-              << this->mapping.getCircQubit(toMoveHwQubit) << std::endl;
+    std::cout << "moved " << move.first << " to " << move.second;
+    if (this->mapping.isMapped(toMoveHwQubit)) {
+      std::cout << "  logical qubit: "
+                << this->mapping.getCircQubit(toMoveHwQubit) << std::endl;
+    } else {
+      std::cout << "  not mapped" << std::endl;
+    }
   }
   nMoves++;
 }
