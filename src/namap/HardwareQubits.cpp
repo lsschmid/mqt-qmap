@@ -218,12 +218,15 @@ HardwareQubits::findClosestFreeCoord(qc::HwQubit           qubit,
 
 fp HardwareQubits::getSwapDistanceMove(CoordIndex idx, HwQubit target) {
   // checks for a move coord the swap distance to the target
-  auto nearbyCoords    = this->arch.getNN(idx);
+  auto nearbyCoords    = this->arch.getNearbyCoordinates(idx);
   fp   minSwapDistance = std::numeric_limits<fp>::infinity();
+  if (nearbyCoords.find(this->getCoordIndex(target)) != nearbyCoords.end()) {
+    return 0;
+  }
   for (const auto& nearbyCoord : nearbyCoords) {
     if (this->isMapped(nearbyCoord)) {
       auto swapDistance =
-          this->getSwapDistance(target, this->getHwQubit(nearbyCoord));
+          this->getSwapDistance(target, this->getHwQubit(nearbyCoord)) + 1;
       if (swapDistance < minSwapDistance) {
         minSwapDistance = swapDistance;
       }
