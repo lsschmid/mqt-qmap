@@ -18,12 +18,13 @@ using GateList = std::set<std::unique_ptr<qc::Operation>*>;
 class NeutralAtomMapper {
 protected:
   struct MapperParameters {
-    fp lookaheadWeightSwaps         = 0.1;
-    fp lookaheadWeightMoves         = 0.1;
-    fp decay                        = 0.1;
-    fp shuttlingTimeWeight          = 1;
-    fp shuttlingMakeExecutableBonus = 1;
-    fp multiQubitGateWeight         = 1;
+    fp lookaheadWeightSwaps          = 0.1;
+    fp lookaheadWeightMoves          = 0.1;
+    fp decay                         = 0.1;
+    fp shuttlingTimeWeight           = 1;
+    fp shuttlingMakeExecutableBonus  = 1;
+    fp multiQubitGateWeight          = 1;
+    fp multiQubitGateWeightShuttling = 1;
   };
 
   qc::NeutralAtomArchitecture                  arch;
@@ -77,13 +78,14 @@ protected:
   void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
 
   // Methods for mapping
-  Swap               findBestSwap();
-  GateList           getExecutableGates();
-  std::set<Swap>     getAllPossibleSwaps();
-  AtomMove           findBestAtomMove();
-  std::set<MoveComb> getAllPossibleMoveCombinations();
-  std::set<MoveComb> getNearbyMoveCombinations(HwQubit start, HwQubit target);
-  std::set<MoveComb> getMoveAwayCombinations(HwQubit start, HwQubit target);
+  Swap           findBestSwap();
+  GateList       getExecutableGates();
+  std::set<Swap> getAllPossibleSwaps();
+  AtomMove       findBestAtomMove();
+  MoveCombs      getAllPossibleMoveCombinations();
+  MoveCombs      getNearbyMoveCombinations(HwQubit start, HwQubit target);
+  MoveCombs      getMoveAwayCombinationsNearby(HwQubit start, HwQubit target);
+  MoveCombs      getMoveAwayCombinations(CoordIndex start, CoordIndex target);
 
   void updateMapping(Swap swap);
   void updateMappingMove(AtomMove move);
@@ -105,7 +107,8 @@ protected:
                                         HwQubits        selectedQubits,
                                         HwQubits        remainingQubits);
   std::vector<std::pair<SwapOrMove, fp>>
-  getExactMoveToPosition(HwQubits gateQubits, HwQubits position);
+            getExactMoveToPosition(HwQubits gateQubits, HwQubits position);
+  MoveCombs getMoveCombinationsToPosition(HwQubits& gateQubits);
   // temp
   void printLayers();
 

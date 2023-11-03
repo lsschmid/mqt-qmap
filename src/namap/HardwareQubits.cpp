@@ -179,11 +179,10 @@ std::set<CoordIndex> HardwareQubits::getNearbyFreeCoordinates(HwQubit q) {
 }
 
 std::vector<CoordIndex>
-HardwareQubits::findClosestFreeCoord(qc::HwQubit           qubit,
+HardwareQubits::findClosestFreeCoord(CoordIndex            coord,
                                      MoveVector::Direction direction) {
   // return the closest free coord in general
   // and the closest free coord in the given direction
-  auto                    coord = getCoordIndex(qubit);
   std::vector<CoordIndex> closestFreeCoords;
   std::queue<CoordIndex>  queue;
   queue.push(coord);

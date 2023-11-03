@@ -22,4 +22,38 @@ bool MoveVector::include(const qc::MoveVector& other) const {
   return includeX && includeY;
 }
 
+void MoveCombs::addMoveComb(const qc::MoveComb& otherMove) {
+  for (auto& comb : moveCombs) {
+    if (comb == otherMove) {
+      comb.cost = std::numeric_limits<fp>::quiet_NaN();
+      return;
+    }
+  }
+  moveCombs.push_back(otherMove);
+}
+
+void MoveCombs::addMoveCombs(const qc::MoveCombs& otherMoveCombs) {
+  for (const auto& otherMove : otherMoveCombs.moveCombs) {
+    addMoveComb(otherMove);
+  }
+}
+
+void MoveCombs::removeAllWithSameStart(const qc::MoveComb& moveComb) {
+  moveCombs.erase(std::remove_if(moveCombs.begin(), moveCombs.end(),
+                                 [&moveComb](const MoveComb& comb) {
+                                   return comb.getFirstMove().first ==
+                                          moveComb.getFirstMove().first;
+                                 }),
+                  moveCombs.end());
+}
+
+void MoveCombs::removeAllWithSameEnd(const qc::MoveComb& moveComb) {
+  moveCombs.erase(std::remove_if(moveCombs.begin(), moveCombs.end(),
+                                 [&moveComb](const MoveComb& comb) {
+                                   return comb.getLastMove().second ==
+                                          moveComb.getLastMove().second;
+                                 }),
+                  moveCombs.end());
+}
+
 } // namespace qc

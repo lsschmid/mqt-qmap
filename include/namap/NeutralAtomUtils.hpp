@@ -5,6 +5,7 @@
 #pragma once
 
 #include "Definitions.hpp"
+#include "namap/NeutralAtomDefinitions.hpp"
 #include "utils.hpp"
 
 namespace qc {
@@ -87,6 +88,65 @@ struct MoveVector {
   }
   [[nodiscard]] bool overlap(const MoveVector& other) const;
   [[nodiscard]] bool include(const MoveVector& other) const;
+};
+
+struct MoveComb {
+  std::vector<AtomMove> moves;
+  fp                    cost = std::numeric_limits<fp>::quiet_NaN();
+
+  MoveComb(std::vector<AtomMove> moves, fp weight, fp cost)
+      : moves(std::move(moves)), cost(cost) {}
+  MoveComb(AtomMove, fp weight, fp cost)
+      : moves(std::vector<AtomMove>{std::move(moves)}), cost(cost) {}
+
+  MoveComb(std::vector<AtomMove> moves) : moves(std::move(moves)) {}
+  MoveComb(AtomMove move) : moves(std::vector<AtomMove>{std::move(move)}) {}
+
+  [[nodiscard]] AtomMove inline getFirstMove() const { return *moves.begin(); }
+  [[nodiscard]] AtomMove inline getLastMove() const { return *moves.rbegin(); }
+  // implement == operator for AtomMove
+  [[nodiscard]] inline bool operator==(const MoveComb& other) const {
+    return moves == other.moves;
+  }
+  [[nodiscard]] inline bool operator!=(const MoveComb& other) const {
+    return !(*this == other);
+  }
+
+  [[nodiscard]] inline void append(AtomMove& addMove) {
+    moves.push_back(addMove);
+    cost = std::numeric_limits<fp>::quiet_NaN();
+  }
+  [[nodiscard]] inline size_t size() const { return moves.size(); }
+  [[nodiscard]] inline bool   empty() const { return moves.empty(); }
+
+  [[nodiscard]] inline bool containsCoord(CoordIndex idx) {
+    return std::any_of(moves.begin(), moves.end(), [idx](const AtomMove& move) {
+      return move.first == idx || move.second == idx;
+    });
+  }
+};
+
+struct MoveCombs {
+  std::vector<MoveComb> moveCombs;
+
+  MoveCombs() = default;
+  MoveCombs(std::vector<MoveComb> moveCombs) : moveCombs(moveCombs) {}
+
+  [[nodiscard]] bool inline empty() const { return moveCombs.empty(); }
+  [[nodiscard]] size_t inline size() const { return moveCombs.size(); }
+
+  // define iterators that iterate over the moveCombs vector
+  typedef std::vector<MoveComb>::iterator       iterator;
+  typedef std::vector<MoveComb>::const_iterator const_iterator;
+  iterator       begin() { return moveCombs.begin(); }
+  iterator       end() { return moveCombs.end(); }
+  const_iterator begin() const { return moveCombs.begin(); }
+  const_iterator end() const { return moveCombs.end(); }
+
+  void addMoveComb(const MoveComb& moveComb);
+  void addMoveCombs(const MoveCombs& otherMoveCombs);
+  void removeAllWithSameStart(const MoveComb& moveComb);
+  void removeAllWithSameEnd(const MoveComb& moveComb);
 };
 
 } // namespace qc
