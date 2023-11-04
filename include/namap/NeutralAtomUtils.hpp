@@ -94,10 +94,10 @@ struct MoveComb {
   std::vector<AtomMove> moves;
   fp                    cost = std::numeric_limits<fp>::quiet_NaN();
 
-  MoveComb(std::vector<AtomMove> moves, fp weight, fp cost)
+  MoveComb(std::vector<AtomMove> moves, fp cost)
       : moves(std::move(moves)), cost(cost) {}
-  MoveComb(AtomMove, fp weight, fp cost)
-      : moves(std::vector<AtomMove>{std::move(moves)}), cost(cost) {}
+  MoveComb(AtomMove move, fp cost)
+      : moves(std::vector<AtomMove>{std::move(move)}), cost(cost) {}
 
   MoveComb(std::vector<AtomMove> moves) : moves(std::move(moves)) {}
   MoveComb(AtomMove move) : moves(std::vector<AtomMove>{std::move(move)}) {}
@@ -112,7 +112,7 @@ struct MoveComb {
     return !(*this == other);
   }
 
-  [[nodiscard]] inline void append(AtomMove& addMove) {
+  inline void append(AtomMove& addMove) {
     moves.push_back(addMove);
     cost = std::numeric_limits<fp>::quiet_NaN();
   }
