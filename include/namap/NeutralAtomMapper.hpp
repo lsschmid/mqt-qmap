@@ -86,7 +86,7 @@ protected:
   estimateNumSwapGates(const std::unique_ptr<qc::Operation>* opPointer);
   std::pair<uint32_t, fp>
        estimateNumMove(const std::unique_ptr<qc::Operation>* opPointer);
-  bool SwapGateBetter(const std::unique_ptr<qc::Operation>* opPointer);
+  bool swapGateBetter(const std::unique_ptr<qc::Operation>* opPointer);
 
   // Methods for mapping
   Swap           findBestSwap();

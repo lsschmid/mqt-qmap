@@ -445,7 +445,7 @@ bool qc::NeutralAtomMapper::isExecutable(
 
 void qc::NeutralAtomMapper::addToFrontLayer(
     std::unique_ptr<qc::Operation>* opPointer) {
-  if (SwapGateBetter(opPointer)) {
+  if (swapGateBetter(opPointer)) {
     this->frontLayerGate.insert(opPointer);
     // remove from lookahead layer if there
     if (this->lookaheadLayerGate.find(opPointer) !=
@@ -466,7 +466,7 @@ void qc::NeutralAtomMapper::addToFrontLayer(
 
 void NeutralAtomMapper::addToLookaheadLayer(
     std::unique_ptr<qc::Operation>* opPointer) {
-  if (SwapGateBetter(opPointer)) {
+  if (swapGateBetter(opPointer)) {
     this->lookaheadLayerGate.insert(opPointer);
   } else {
     this->lookaheadLayerShuttling.insert(opPointer);
@@ -1243,7 +1243,7 @@ std::pair<uint32_t, fp> NeutralAtomMapper::estimateNumMove(
   return {minMoves, minTime};
 }
 
-bool NeutralAtomMapper::SwapGateBetter(
+bool NeutralAtomMapper::swapGateBetter(
     const std::unique_ptr<qc::Operation>* opPointer) {
   auto [minNumSwaps, minTimeSwaps] = estimateNumSwapGates(opPointer);
   auto [minMoves, minTimeMoves]    = estimateNumMove(opPointer);
