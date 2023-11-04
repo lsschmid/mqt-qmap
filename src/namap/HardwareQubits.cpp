@@ -169,13 +169,30 @@ HardwareQubits::getBlockedQubits(const std::set<HwQubit>& qubits) {
 }
 
 std::set<CoordIndex> HardwareQubits::getNearbyFreeCoordinates(HwQubit q) {
+  return getNearbyFreeCoordinatesByCoord(hwToCoordIdx.at(q));
+}
+
+std::set<CoordIndex>
+HardwareQubits::getNearbyFreeCoordinatesByCoord(qc::CoordIndex idx) {
   std::set<CoordIndex> nearbyFreeCoordinates;
-  for (auto const& coordIndex : this->getNearbyCoordinates(q)) {
+  for (auto const& coordIndex : this->arch.getNearbyCoordinates(idx)) {
     if (!this->isMapped(coordIndex)) {
       nearbyFreeCoordinates.insert(coordIndex);
     }
   }
   return nearbyFreeCoordinates;
+}
+
+std::set<CoordIndex>
+HardwareQubits::getNearbyOccupiedCoordinates(qc::HwQubit q) {
+  auto nearbyHwQubits = this->getNearbyQubits(q);
+  return this->getCoordIndices(nearbyHwQubits);
+}
+
+std::set<CoordIndex>
+HardwareQubits::getNearbyOccupiedCoordinatesByCoord(qc::CoordIndex idx) {
+  auto nearbyHwQubits = this->getNearbyQubits(this->getHwQubit(idx));
+  return this->getCoordIndices(nearbyHwQubits);
 }
 
 std::vector<CoordIndex>
