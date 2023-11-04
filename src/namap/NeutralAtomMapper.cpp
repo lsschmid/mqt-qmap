@@ -24,7 +24,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
     throw std::runtime_error("More qubits in circuit than in architecture");
   }
 
-  std::cout << "test" << std::endl;
+  std::cout << "test" << '\n';
 
   this->parameters.lookaheadWeightSwaps = 0.0;
   this->parameters.lookaheadWeightMoves = 0.1;
@@ -34,6 +34,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   this->parameters.shuttlingMakeExecutableBonus  = 1;
   this->parameters.multiQubitGateWeight          = 1;
   this->parameters.multiQubitGateWeightShuttling = 1;
+  this->parameters.gateShuttlingWeight           = 1;
   this->verbose                                  = false;
 
   //   precompute all distances
@@ -57,28 +58,47 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   // TODO: find SWAP
   // TODO: get list of front gates that can be executed now
   auto i = 0;
-  while (!this->frontLayer.empty()) {
-    i++;
-    if (this->verbose) {
-      std::cout << "iteration " << i << std::endl;
+  while (!this->frontLayerGate.empty() || !this->frontLayerShuttling.empty()) {
+    // first do all gate based Mapping
+    while (!this->frontLayerGate.empty()) {
+      std::set<std::unique_ptr<Operation>*> gatesToExecute;
+      while (gatesToExecute.empty()) {
+        ++i;
+        if (this->verbose) {
+          std::cout << "iteration " << i << '\n';
+        }
+        auto bestSwap = findBestSwap();
+        updateMapping(bestSwap);
+        //      auto bestMove = findBestAtomMove();
+        //      updateMappingMove(bestMove);
+        gatesToExecute = getExecutableGates();
+      }
+      updateFrontLayerByGate(gatesToExecute);
+      updateLookaheadLayerByQubit();
+      if (this->verbose) {
+        printLayers();
+      }
     }
-    std::set<std::unique_ptr<Operation>*> gatesToExecute;
-    while (gatesToExecute.empty()) {
-      //      auto bestSwap = findBestSwap();
-      //      updateMapping(bestSwap);
-      auto bestMove = findBestAtomMove();
-      updateMappingMove(bestMove);
-      gatesToExecute = getExecutableGates();
-    }
-    updateFrontLayerByGate(gatesToExecute);
-    //    printLayers();
-    updateLookaheadLayerByQubit();
-    if (this->verbose) {
-      printLayers();
+    while (!this->frontLayerShuttling.empty()) {
+      std::set<std::unique_ptr<Operation>*> gatesToExecute;
+      while (gatesToExecute.empty()) {
+        ++i;
+        if (this->verbose) {
+          std::cout << "iteration " << i << '\n';
+        }
+        auto bestMove = findBestAtomMove();
+        updateMappingMove(bestMove);
+        gatesToExecute = getExecutableGates();
+      }
+      updateFrontLayerByGate(gatesToExecute);
+      updateLookaheadLayerByQubit();
+      if (this->verbose) {
+        printLayers();
+      }
     }
   }
-  std::cout << "nSwaps: " << nSwaps << std::endl;
-  std::cout << "nMoves: " << nMoves << std::endl;
+  std::cout << "nSwaps: " << nSwaps << '\n';
+  std::cout << "nMoves: " << nMoves << '\n';
   qc::CircuitOptimizer::decomposeSWAP(this->mappedQc, false);
   AodScheduler scheduler(this->arch);
   auto         scheduledQc = scheduler.schedule(this->mappedQc);
@@ -111,8 +131,16 @@ void qc::NeutralAtomMapper::updateFrontLayerByGate(
     mapGate(gate);
     // update DAG iterators
     // remove from FrontLayer
-    this->frontLayer.erase(
-        std::find(this->frontLayer.begin(), this->frontLayer.end(), gate));
+    if (this->frontLayerGate.find(gate) != this->frontLayerGate.end()) {
+      this->frontLayerGate.erase(std::find(this->frontLayerGate.begin(),
+                                           this->frontLayerGate.end(), gate));
+    }
+    if (this->frontLayerShuttling.find(gate) !=
+        this->frontLayerShuttling.end()) {
+      this->frontLayerShuttling.erase(
+          std::find(this->frontLayerShuttling.begin(),
+                    this->frontLayerShuttling.end(), gate));
+    }
   }
   updateFrontLayerByQubit();
 }
@@ -137,15 +165,19 @@ void qc::NeutralAtomMapper::findFrontCandidates() {
         while (commutes && tempIter != this->dag[qubit].end()) {
           auto* nextOpPointer = *tempIter;
           commutes =
-              commutesWithAtQubit(this->frontLayer, nextOpPointer, qubit) &&
+              commutesWithAtQubit(this->frontLayerGate, nextOpPointer, qubit) &&
+              commutesWithAtQubit(this->frontLayerShuttling, nextOpPointer,
+                                  qubit) &&
               commutesWithAtQubit(this->frontCandidates[qubit], nextOpPointer,
                                   qubit);
           if (commutes) {
             if (nextOpPointer->get()->getUsedQubits().size() == 1) {
               mapGate(nextOpPointer);
             } else { // not executable but commutes
-              if (this->frontLayer.find(nextOpPointer) ==
-                  this->frontLayer.end()) {
+              if (this->frontLayerGate.find(nextOpPointer) ==
+                      this->frontLayerGate.end() &&
+                  this->frontLayerShuttling.find(nextOpPointer) ==
+                      this->frontLayerShuttling.end()) {
                 this->frontCandidates[qubit].insert(nextOpPointer);
               }
             }
@@ -192,9 +224,13 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
             this->frontQubitsToUpdate.insert(opQubit);
           }
           // remove from lookahead layer if there
-          if (this->lookaheadLayer.find(opPointer) !=
-              this->lookaheadLayer.end()) {
-            this->lookaheadLayer.erase(opPointer);
+          if (this->lookaheadLayerGate.find(opPointer) !=
+              this->lookaheadLayerGate.end()) {
+            this->lookaheadLayerGate.erase(opPointer);
+          }
+          if (this->lookaheadLayerShuttling.find(opPointer) !=
+              this->lookaheadLayerShuttling.end()) {
+            this->lookaheadLayerShuttling.erase(opPointer);
           }
         } else {
           addToFrontLayer(opPointer);
@@ -255,10 +291,8 @@ bool qc::NeutralAtomMapper::commuteAtQubit(
   // commutes at qubit if at least one of the two gates does not use qubit
   auto usedQubits1 = op1->getUsedQubits();
   auto usedQubits2 = op2->getUsedQubits();
-  if (std::find(usedQubits1.begin(), usedQubits1.end(), qubit) ==
-          usedQubits1.end() ||
-      std::find(usedQubits2.begin(), usedQubits2.end(), qubit) ==
-          usedQubits2.end()) {
+  if (usedQubits1.find(qubit) == usedQubits1.end() ||
+      usedQubits2.find(qubit) == usedQubits2.end()) {
     return true;
   }
 
@@ -290,7 +324,7 @@ void qc::NeutralAtomMapper::updateLookaheadLayerByQubit() {
 }
 
 void qc::NeutralAtomMapper::updateLookaheadLayerByCandidates() {
-  for (auto& qubit : this->lookaheadQubitsToUpdate) {
+  for (const auto& qubit : this->lookaheadQubitsToUpdate) {
     std::vector<std::unique_ptr<qc::Operation>*> toRemove;
     for (auto* opPointer : this->lookaheadCandidates[qubit]) {
       bool  inLookahead = true;
@@ -307,7 +341,7 @@ void qc::NeutralAtomMapper::updateLookaheadLayerByCandidates() {
         }
       }
       if (inLookahead) {
-        this->lookaheadLayer.insert(opPointer);
+        addToLookaheadLayer(opPointer);
         // remove from candidacy of other qubits
         for (const auto& opQubit : op->getUsedQubits()) {
           if (qubit == opQubit) {
@@ -411,40 +445,83 @@ bool qc::NeutralAtomMapper::isExecutable(
 
 void qc::NeutralAtomMapper::addToFrontLayer(
     std::unique_ptr<qc::Operation>* opPointer) {
-  this->frontLayer.insert(opPointer);
-  // remove from lookahead layer if there
-  if (this->lookaheadLayer.find(opPointer) != this->lookaheadLayer.end()) {
-    this->lookaheadLayer.erase(opPointer);
+  if (SwapGateBetter(opPointer)) {
+    this->frontLayerGate.insert(opPointer);
+    // remove from lookahead layer if there
+    if (this->lookaheadLayerGate.find(opPointer) !=
+        this->lookaheadLayerGate.end()) {
+      this->lookaheadLayerGate.erase(opPointer);
+    }
+  } else {
+    this->frontLayerShuttling.insert(opPointer);
+    // remove from lookahead layer if there
+    if (this->lookaheadLayerShuttling.find(opPointer) !=
+        this->lookaheadLayerShuttling.end()) {
+      this->lookaheadLayerShuttling.erase(opPointer);
+    }
   }
   // remove from front candidates not allowed here
   // to prevent modify while iterating
 }
 
+void NeutralAtomMapper::addToLookaheadLayer(
+    std::unique_ptr<qc::Operation>* opPointer) {
+  if (SwapGateBetter(opPointer)) {
+    this->lookaheadLayerGate.insert(opPointer);
+  } else {
+    this->lookaheadLayerShuttling.insert(opPointer);
+  }
+}
+
 void qc::NeutralAtomMapper::printLayers() {
-  std::cout << "f: ";
-  for (auto* opPointer : this->frontLayer) {
+  std::cout << "f,g: ";
+  for (auto* opPointer : this->frontLayerGate) {
     auto* op = opPointer->get();
     std::cout << op->getName() << " ";
     for (auto qubit : op->getUsedQubits()) {
       std::cout << qubit << " ";
     }
-    std::cout << std::endl;
+    std::cout << '\n';
   }
-  std::cout << "l: ";
-  for (auto* opPointer : this->lookaheadLayer) {
+  std::cout << "f,s: ";
+  for (auto* opPointer : this->frontLayerShuttling) {
     auto* op = opPointer->get();
     std::cout << op->getName() << " ";
     for (auto qubit : op->getUsedQubits()) {
       std::cout << qubit << " ";
     }
-    std::cout << std::endl;
+    std::cout << '\n';
   }
-  std::cout << std::endl;
+  std::cout << "l,g: ";
+  for (auto* opPointer : this->lookaheadLayerGate) {
+    auto* op = opPointer->get();
+    std::cout << op->getName() << " ";
+    for (auto qubit : op->getUsedQubits()) {
+      std::cout << qubit << " ";
+    }
+    std::cout << '\n';
+  }
+  std::cout << '\n';
+  std::cout << "l,g: ";
+  for (auto* opPointer : this->lookaheadLayerShuttling) {
+    auto* op = opPointer->get();
+    std::cout << op->getName() << " ";
+    for (auto qubit : op->getUsedQubits()) {
+      std::cout << qubit << " ";
+    }
+    std::cout << '\n';
+  }
+  std::cout << '\n';
 }
 
 GateList NeutralAtomMapper::getExecutableGates() {
   GateList executableGates;
-  for (auto* opPointer : this->frontLayer) {
+  for (auto* opPointer : this->frontLayerGate) {
+    if (isExecutable(opPointer)) {
+      executableGates.insert(opPointer);
+    }
+  }
+  for (auto* opPointer : this->frontLayerShuttling) {
     if (isExecutable(opPointer)) {
       executableGates.insert(opPointer);
     }
@@ -478,7 +555,7 @@ void NeutralAtomMapper::updateMapping(qc::Swap swap) {
     } else {
       std::cout << " not mapped";
     }
-    std::cout << std::endl;
+    std::cout << '\n';
   }
 }
 
@@ -494,9 +571,9 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
     std::cout << "moved " << move.first << " to " << move.second;
     if (this->mapping.isMapped(toMoveHwQubit)) {
       std::cout << "  logical qubit: "
-                << this->mapping.getCircQubit(toMoveHwQubit) << std::endl;
+                << this->mapping.getCircQubit(toMoveHwQubit) << '\n';
     } else {
-      std::cout << "  not mapped" << std::endl;
+      std::cout << "  not mapped" << '\n';
     }
   }
   nMoves++;
@@ -504,9 +581,9 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
 
 qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   // compute necessary movements
-  initSwapAndMove(this->frontLayer, this->swapCloseByFront,
+  initSwapAndMove(this->frontLayerGate, this->swapCloseByFront,
                   this->moveExactFront);
-  initSwapAndMove(this->lookaheadLayer, this->swapCloseByLookahead,
+  initSwapAndMove(this->lookaheadLayerGate, this->swapCloseByLookahead,
                   this->moveExactLookahead);
 
   // evaluate swaps based on cost function
@@ -530,7 +607,7 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
 
 std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
   std::set<Swap> swaps;
-  for (const auto& op : this->frontLayer) {
+  for (const auto& op : this->frontLayerGate) {
     for (const auto& qubit : op->get()->getUsedQubits()) {
       auto nearbySwaps =
           this->hardwareQubits.getNearbySwaps(this->mapping.getHwQubit(qubit));
@@ -546,12 +623,12 @@ fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
   // compute the change in total distance
   auto distanceChangeFront =
       distancePerLayer(swap, this->swapCloseByFront, this->moveExactFront) /
-      static_cast<fp>(this->frontLayer.size());
+      static_cast<fp>(this->frontLayerGate.size());
   fp distanceChangeLookahead = 0;
-  if (!this->lookaheadLayer.empty()) {
+  if (!this->lookaheadLayerGate.empty()) {
     distanceChangeLookahead = distancePerLayer(swap, this->swapCloseByLookahead,
                                                this->moveExactLookahead) /
-                              static_cast<fp>(this->lookaheadLayer.size());
+                              static_cast<fp>(this->lookaheadLayerGate.size());
   }
   auto cost = parameters.lookaheadWeightSwaps * distanceChangeLookahead +
               distanceChangeFront;
@@ -589,7 +666,7 @@ void NeutralAtomMapper::initSwapAndMove(
         for (auto qubit : bestPos) {
           std::cout << qubit << " ";
         }
-        std::cout << std::endl;
+        std::cout << '\n';
       }
       auto exactMoves = getExactMoveToPosition(usedHwQubits, bestPos);
       moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
@@ -789,7 +866,7 @@ NeutralAtomMapper::getExactMoveToPosition(HwQubits gateQubits,
 
     auto assignedGateQubit = std::get<0>(*assignFirst);
     auto assignedPosQubits = std::get<1>(*assignFirst);
-    // for multiple equal good posiitons, choose the one that
+    // for multiple equal good positions, choose the one that
     // is not assigned to one of the other ones
     HwQubit assignedPosQubit = *assignedPosQubits.begin();
     if (assignedPosQubits.size() > 1) {
@@ -875,12 +952,13 @@ fp NeutralAtomMapper::moveCostComb(const qc::MoveComb& moveComb) {
 
 fp NeutralAtomMapper::moveCost(const AtomMove& move) {
   fp   cost      = 0;
-  auto frontCost = moveDistancePerLayer(move, this->frontLayer) /
-                   static_cast<fp>(this->frontLayer.size());
+  auto frontCost = moveDistancePerLayer(move, this->frontLayerShuttling) /
+                   static_cast<fp>(this->frontLayerShuttling.size());
   cost += frontCost;
-  if (!lookaheadLayer.empty()) {
-    auto lookaheadCost = moveDistancePerLayer(move, this->lookaheadLayer) /
-                         static_cast<fp>(this->lookaheadLayer.size());
+  if (!lookaheadLayerShuttling.empty()) {
+    auto lookaheadCost =
+        moveDistancePerLayer(move, this->lookaheadLayerShuttling) /
+        static_cast<fp>(this->lookaheadLayerShuttling.size());
     cost += parameters.lookaheadWeightMoves * lookaheadCost;
   }
   auto parallelCost = parameters.shuttlingTimeWeight * parallelMoveCost(move);
@@ -974,7 +1052,7 @@ fp NeutralAtomMapper::parallelMoveCost(const qc::AtomMove& move) {
 
 MoveCombs NeutralAtomMapper::getAllPossibleMoveCombinations() {
   MoveCombs moves;
-  for (const auto& op : this->frontLayer) {
+  for (const auto& op : this->frontLayerShuttling) {
     auto usedQubits   = op->get()->getUsedQubits();
     auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
     if (usedHwQubits.size() == 2) {
@@ -1082,6 +1160,101 @@ MoveCombs NeutralAtomMapper::getMoveAwayCombinations(CoordIndex startCoord,
     moveCombinations.addMoveComb(MoveComb({moveAway, move}));
   }
   return moveCombinations;
+}
+
+std::pair<uint32_t, fp> NeutralAtomMapper::estimateNumSwapGates(
+    const std::unique_ptr<qc::Operation>* opPointer) {
+  auto* op           = opPointer->get();
+  auto  usedQubits   = op->getUsedQubits();
+  auto  usedHwQubits = this->mapping.getHwQubits(usedQubits);
+  fp    minDistance  = std::numeric_limits<fp>::infinity();
+  for (const auto& hwQubit : usedHwQubits) {
+    for (const auto& otherHwQubit : usedHwQubits) {
+      if (hwQubit == otherHwQubit) {
+        continue;
+      }
+      auto distance =
+          this->hardwareQubits.getSwapDistance(hwQubit, otherHwQubit);
+      if (distance < minDistance) {
+        minDistance = distance;
+      }
+    }
+  }
+  const auto minNumSwaps = static_cast<uint32_t>(std::ceil(minDistance));
+  const fp   minTime     = minNumSwaps * this->arch.getGateTime(OpType::SWAP);
+  return {minNumSwaps, minTime};
+}
+
+std::pair<uint32_t, fp> NeutralAtomMapper::estimateNumMove(
+    const std::unique_ptr<qc::Operation>* opPointer) {
+  auto* op           = opPointer->get();
+  auto  usedQubits   = op->getUsedQubits();
+  auto  usedHwQubits = this->mapping.getHwQubits(usedQubits);
+  auto  usedCoords   = this->hardwareQubits.getCoordIndices(usedHwQubits);
+  // estimate the number of moves as:
+  // compute distance between qubits
+  // 1. for each free coord in the vecinity = 1 move with corresponding distance
+  // 2. for each occupied coord in the vecinity = 2 moves with corresponding
+  // distance
+
+  uint32_t minMoves = std::numeric_limits<uint32_t>::max();
+  fp       minTime  = std::numeric_limits<fp>::infinity();
+  for (const auto& coord : usedCoords) {
+    fp       totalTime  = 0;
+    uint32_t totalMoves = 0;
+    auto     nearbyFreeCoords =
+        this->hardwareQubits.getNearbyFreeCoordinatesByCoord(coord);
+    auto neabyOccupiedCoords =
+        this->hardwareQubits.getNearbyOccupiedCoordinatesByCoord(coord);
+    auto otherQubitsIt = usedCoords.begin();
+    auto nearbyFreeIt  = nearbyFreeCoords.begin();
+    auto nearbyOccIt   = neabyOccupiedCoords.begin();
+    while (otherQubitsIt != usedCoords.end()) {
+      auto otherCoord = *otherQubitsIt;
+      if (otherCoord == coord) {
+        otherQubitsIt++;
+        continue;
+      }
+      if (nearbyFreeIt != nearbyFreeCoords.end()) {
+        totalTime += this->arch.getVectorShuttlingTime(
+            this->arch.getVector(otherCoord, *nearbyFreeIt));
+        nearbyFreeIt++;
+        totalMoves++;
+      } else if (nearbyOccIt != neabyOccupiedCoords.end()) {
+        totalTime += 2 * this->arch.getVectorShuttlingTime(
+                             this->arch.getVector(otherCoord, *nearbyOccIt));
+        nearbyOccIt++;
+        totalMoves += 2;
+      } else {
+        throw std::runtime_error(
+            "Not enough free or occupied coords to execute a multi-qubit gate. "
+            "-> should not happen");
+      }
+
+      otherQubitsIt++;
+    }
+
+    if (totalTime < minTime) {
+      minTime  = totalTime;
+      minMoves = totalMoves;
+    }
+  }
+
+  return {minMoves, minTime};
+}
+
+bool NeutralAtomMapper::SwapGateBetter(
+    const std::unique_ptr<qc::Operation>* opPointer) {
+  auto [minNumSwaps, minTimeSwaps] = estimateNumSwapGates(opPointer);
+  auto [minMoves, minTimeMoves]    = estimateNumMove(opPointer);
+  auto fidSwaps =
+      std::exp(-minTimeSwaps / this->arch.getDecoherenceTime()) *
+      std::pow(this->arch.getGateAverageFidelity(OpType::SWAP), minNumSwaps);
+  auto fidMoves =
+      std::exp(-minTimeMoves / this->arch.getDecoherenceTime()) *
+      std::pow(this->arch.getGateAverageFidelity(OpType::Move), minMoves);
+
+  return fidSwaps * parameters.gateShuttlingWeight > fidMoves;
 }
 
 } // namespace qc

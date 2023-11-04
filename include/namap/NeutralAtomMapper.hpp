@@ -25,19 +25,22 @@ protected:
     fp shuttlingMakeExecutableBonus  = 1;
     fp multiQubitGateWeight          = 1;
     fp multiQubitGateWeightShuttling = 1;
+    fp gateShuttlingWeight           = 1;
   };
 
   qc::NeutralAtomArchitecture                  arch;
   qc::QuantumComputation                       mappedQc;
   std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
-  GateList                                     frontLayer;
+  GateList                                     frontLayerGate;
+  GateList                                     frontLayerShuttling;
   std::set<Qubit>                              frontQubitsToUpdate;
   std::vector<GateList>                        frontCandidates;
   DAG                                          dag;
   DAGIterators                                 frontLayerIterators;
   std::vector<SwapOrMove>                      swapCloseByFront;
   std::vector<std::pair<SwapOrMove, fp>>       moveExactFront;
-  GateList                                     lookaheadLayer;
+  GateList                                     lookaheadLayerGate;
+  GateList                                     lookaheadLayerShuttling;
   std::vector<uint32_t>                        lookaheadOffsets;
   std::vector<GateList>                        lookaheadCandidates;
   std::set<Qubit>                              lookaheadQubitsToUpdate;
@@ -76,6 +79,14 @@ protected:
                              const Qubit&                          qubit);
   bool        isExecutable(std::unique_ptr<qc::Operation>* opPointer);
   void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
+  void        addToLookaheadLayer(std::unique_ptr<qc::Operation>* opPointer);
+
+  // Methods for estimation
+  std::pair<uint32_t, fp>
+  estimateNumSwapGates(const std::unique_ptr<qc::Operation>* opPointer);
+  std::pair<uint32_t, fp>
+       estimateNumMove(const std::unique_ptr<qc::Operation>* opPointer);
+  bool SwapGateBetter(const std::unique_ptr<qc::Operation>* opPointer);
 
   // Methods for mapping
   Swap           findBestSwap();
