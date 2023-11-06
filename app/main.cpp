@@ -1,0 +1,129 @@
+//
+// Created by Ludwig Schmid on 06.11.23.
+//
+
+#include "filesystem"
+#include "namap/NeutralAtomMapper.hpp"
+
+int main(int argc, char* argv[]) {
+  if (argc != 16) {
+    std::cerr << "Usage: " << argv[0]
+              << " <runIdx> <input_directory> <output_directory> "
+                 "<lookaheadGate> <lookaheadShuttling> <gateDecay> "
+                 "<shuttlingTimeWeight> <shuttlingMakeExecutableBonus> "
+                 "<shuttlingMulitQubitWeight> <gateMulitQubitWeight> "
+                 "<gateOrShuttlingWeight> <verbose> <json_config_file_path> "
+                 "<initialCoordinateMapping> <initialCircuitMapping>\n";
+    return 1;
+  }
+
+  int         runIdx                       = std::atoi(argv[1]);
+  std::string input_directory              = argv[2];
+  std::string output_directory             = argv[3];
+  double      lookaheadGate                = std::stod(argv[4]);
+  double      lookaheadShuttling           = std::stod(argv[5]);
+  double      gateDecay                    = std::stod(argv[6]);
+  double      shuttlingTimeWeight          = std::stod(argv[7]);
+  double      shuttlingMakeExecutableBonus = std::stod(argv[8]);
+  double      shuttlingMulitQubitWeight    = std::stod(argv[9]);
+  double      gateMulitQubitWeight         = std::stod(argv[10]);
+  double      gateOrShuttlingWeight        = std::stod(argv[11]);
+  bool        verbose                      = std::atoi(argv[12]) != 0;
+  std::string json_config_file_path        = argv[13];
+  std::string initialCoordinateMapping     = argv[14];
+  std::string initialCircuitMapping        = argv[15];
+
+  // Check if the output directory exists and create it if it doesn't.
+  if (!std::filesystem::exists(output_directory)) {
+    if (!std::filesystem::create_directory(output_directory)) {
+      std::cerr << "Failed to create the output directory.\n";
+      return 1;
+    }
+  }
+
+  // init Mappings
+  qc::InitialCoordinateMapping initialCoordinateMappingEnum;
+  if (initialCoordinateMapping == "trivial") {
+    initialCoordinateMappingEnum = qc::InitialCoordinateMapping::Trivial;
+  } else if (initialCoordinateMapping == "random") {
+    initialCoordinateMappingEnum = qc::InitialCoordinateMapping::Random;
+  } else {
+    std::cerr << "Unknown initial coordinate mapping: "
+              << initialCoordinateMapping << "\n";
+    return 1;
+  }
+  qc::InitialMapping initialCircuitMappingEnum;
+  if (initialCircuitMapping == "identity") {
+    initialCircuitMappingEnum = qc::InitialMapping::Identity;
+  } else {
+    std::cerr << "Unknown initial circuit mapping: " << initialCircuitMapping
+              << "\n";
+    return 1;
+  }
+
+  // read files
+  std::vector<std::string> qasmFiles;
+  for (const auto& entry :
+       std::filesystem::directory_iterator(input_directory)) {
+    if (entry.is_regular_file() && entry.path().extension() == ".qasm") {
+      qasmFiles.push_back(entry.path().string());
+    }
+  }
+
+  for (const auto& qasmFile : qasmFiles) {
+    // create arch
+    qc::NeutralAtomArchitecture arch =
+        qc::NeutralAtomArchitecture(json_config_file_path);
+    // start mapping
+    qc::NeutralAtomMapper mapper =
+        qc::NeutralAtomMapper(arch, initialCoordinateMappingEnum);
+    qc::MapperParameters mapperParameters;
+    mapperParameters.lookaheadWeightSwaps = lookaheadGate;
+    mapperParameters.lookaheadWeightMoves = lookaheadShuttling;
+    mapperParameters.decay                = gateDecay;
+    mapperParameters.shuttlingTimeWeight  = shuttlingTimeWeight;
+    mapperParameters.shuttlingMakeExecutableBonus =
+        shuttlingMakeExecutableBonus;
+    mapperParameters.multiQubitGateWeight          = shuttlingMulitQubitWeight;
+    mapperParameters.multiQubitGateWeightShuttling = gateMulitQubitWeight;
+    mapperParameters.gateShuttlingWeight           = gateOrShuttlingWeight;
+    mapper.setParameters(mapperParameters);
+
+    std::cout << "Mapping " << qasmFile << "\n";
+    qc::QuantumComputation qc = qc::QuantumComputation(qasmFile);
+    auto          qcMapped = mapper.map(qc, initialCircuitMappingEnum, verbose);
+    std::ofstream ofs(output_directory + "/" +
+                      std::filesystem::path(qasmFile).filename().string() +
+                      "_" + std::to_string(runIdx) + ".qasm_ext");
+    qcMapped.dumpOpenQASM(ofs);
+    auto          qcAodMapped = mapper.mapAod(qcMapped);
+    std::ofstream ofs_aod(output_directory + "/" +
+                          std::filesystem::path(qasmFile).filename().string() +
+                          "_" + std::to_string(runIdx) + ".qasm_aod");
+    qcAodMapped.dumpOpenQASM(ofs_aod);
+    // also dump the scheduler results later...
+
+    // dump the parameters
+    std::ofstream ofs_params(output_directory + "/parameters_" +
+                             std::to_string(runIdx) + ".txt");
+    ofs_params << "lookaheadGate: " << lookaheadGate << "\n";
+    ofs_params << "lookaheadShuttling: " << lookaheadShuttling << "\n";
+    ofs_params << "gateDecay: " << gateDecay << "\n";
+    ofs_params << "shuttlingTimeWeight: " << shuttlingTimeWeight << "\n";
+    ofs_params << "shuttlingMakeExecutableBonus: "
+               << shuttlingMakeExecutableBonus << "\n";
+    ofs_params << "shuttlingMulitQubitWeight: " << shuttlingMulitQubitWeight
+               << "\n";
+    ofs_params << "gateMulitQubitWeight: " << gateMulitQubitWeight << "\n";
+    ofs_params << "gateOrShuttlingWeight: " << gateOrShuttlingWeight << "\n";
+    ofs_params << "verbose: " << verbose << "\n";
+    ofs_params << "json_config_file_path: " << json_config_file_path << "\n";
+    ofs_params << "initialCoordinateMapping: " << initialCoordinateMapping
+               << "\n";
+    ofs_params << "initialCircuitMapping: " << initialCircuitMapping << "\n";
+    // close the file
+    ofs_params.close();
+  }
+
+  return 0;
+}
