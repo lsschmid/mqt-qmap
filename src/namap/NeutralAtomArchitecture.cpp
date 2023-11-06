@@ -27,7 +27,8 @@ void NeutralAtomArchitecture::loadJson(const std::string& filename) {
         jsonDataProperties["nAods"], jsonDataProperties["nAodCoordinates"],
         jsonDataProperties["interQubitDistance"],
         jsonDataProperties["interactionRadius"],
-        jsonDataProperties["blockingFactor"]);
+        jsonDataProperties["blockingFactor"],
+        jsonDataProperties["minimalAodDistance"]);
 
     // Load parameters
     const nlohmann::json jsonDataParameters = jsonData["parameters"];

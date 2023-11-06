@@ -17,8 +17,8 @@ void qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc,
 
     // calculate time & fidelity
     auto opType = op->getType();
-    if (opType == OpType::Move || opType == OpType::Activate ||
-        opType == OpType::Deactivate) { // shuttling
+    if (opType == OpType::Move || opType == OpType::AodActivate ||
+        opType == OpType::AodDeactivate) { // shuttling
       opTime     = arch.getShuttlingTime(op->getType());
       opFidelity = arch.getShuttlingAverageFidelity(op->getType());
     } else { // gate

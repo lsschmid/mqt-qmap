@@ -57,7 +57,6 @@ macro(ADD_NAMAP_LIBRARY libname srcfile)
     ${lib}
     ${libname}/${srcfile}.cpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/${srcfile}.hpp
-    ${PROJECT_SOURCE_DIR}/include/${libname}/ShuttlingOperation.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomMappingResults.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomUtils.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomScheduler.hpp
@@ -66,7 +65,6 @@ macro(ADD_NAMAP_LIBRARY libname srcfile)
     ${PROJECT_SOURCE_DIR}/include/${libname}/Mapping.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomDefinitions.hpp
     ${PROJECT_SOURCE_DIR}/include/${libname}/AodScheduler.hpp
-    namap/ShuttlingOperation.cpp
     namap/NeutralAtomMappingResults.cpp
     namap/NeutralAtomUtils.cpp
     namap/NeutralAtomScheduler.cpp

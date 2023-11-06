@@ -9,10 +9,12 @@
 #include "utils.hpp"
 
 namespace qc {
-QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
+QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
+                                              InitialMapping initialMapping,
+                                              bool           verbose) {
   qc::CircuitOptimizer::removeFinalMeasurements(qc);
   this->dag     = qc::CircuitOptimizer::constructDAG(qc);
-  this->mapping = Mapping(qc.getNqubits(), InitialMapping::Identity);
+  this->mapping = Mapping(qc.getNqubits(), initialMapping);
   for (auto& i : dag) {
     this->frontLayerIterators.push_back(i.begin());
     this->lookaheadOffsets.push_back(0);
@@ -26,16 +28,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
 
   std::cout << "test" << '\n';
 
-  this->parameters.lookaheadWeightSwaps = 0.0;
-  this->parameters.lookaheadWeightMoves = 0.1;
-  this->parameters.decay                = 1;
-  this->parameters.shuttlingTimeWeight  = 0.01;
-  //  this->parameters.shuttlingMakeExecutableBonus = arch.getNcolumns();
-  this->parameters.shuttlingMakeExecutableBonus  = 1;
-  this->parameters.multiQubitGateWeight          = 1;
-  this->parameters.multiQubitGateWeightShuttling = 1;
-  this->parameters.gateShuttlingWeight           = 1;
-  this->verbose                                  = false;
+  this->verbose = verbose;
 
   //   precompute all distances
 
@@ -50,10 +43,6 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   if (this->verbose) {
     printLayers();
   }
-
-  //  hardwareQubits.move(0, 15, arch);
-  // probably need
-  // updateFrontLayerByQubit(list with all qubits) to trigger commutation
 
   // TODO: find SWAP
   // TODO: get list of front gates that can be executed now
@@ -99,10 +88,13 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc) {
   }
   std::cout << "nSwaps: " << nSwaps << '\n';
   std::cout << "nMoves: " << nMoves << '\n';
+  return this->mappedQc;
+}
+
+QuantumComputation NeutralAtomMapper::mapAod(qc::QuantumComputation& qc) {
   qc::CircuitOptimizer::decomposeSWAP(this->mappedQc, false);
   AodScheduler scheduler(this->arch);
-  auto         scheduledQc = scheduler.schedule(this->mappedQc);
-  return scheduledQc;
+  return scheduler.schedule(qc);
 }
 
 void qc::NeutralAtomMapper::createFrontLayer() {

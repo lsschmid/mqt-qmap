@@ -15,5 +15,6 @@ using Qubits      = std::set<Qubit>;
 using HwQubits    = std::set<HwQubit>;
 using HwPositions = std::vector<HwQubits>;
 using SwapOrMove  = std::pair<HwQubit, HwQubit>;
+using OpPointer   = std::unique_ptr<Operation>;
 
 } // namespace qc

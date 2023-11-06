@@ -7,19 +7,39 @@
 namespace qc {
 
 bool MoveVector::overlap(const qc::MoveVector& other) const {
-  auto overlapXStart = xStart <= other.xStart && other.xStart <= xEnd;
-  auto overlapXEnd   = xStart <= other.xEnd && other.xEnd <= xEnd;
-  auto overlapYStart = yStart <= other.yStart && other.yStart <= yEnd;
-  auto overlapYEnd   = yStart <= other.yEnd && other.yEnd <= yEnd;
+  // do not consider direction for overlap
+  const auto firstStartX  = std::min(xStart, xEnd);
+  const auto firstEndX    = std::max(xStart, xEnd);
+  const auto secondStartX = std::min(other.xStart, other.xEnd);
+  const auto secondEndX   = std::max(other.xStart, other.xEnd);
+  const auto firstStartY  = std::min(yStart, yEnd);
+  const auto firstEndY    = std::max(yStart, yEnd);
+  const auto secondStartY = std::min(other.yStart, other.yEnd);
+  const auto secondEndY   = std::max(other.yStart, other.yEnd);
+
+  auto overlapXStart = firstStartX >= secondStartX && firstStartX <= secondEndX;
+  auto overlapXEnd   = firstEndX >= secondStartX && firstEndX <= secondEndX;
+  auto overlapYStart = firstStartY >= secondStartY && firstStartY <= secondEndY;
+  auto overlapYEnd   = firstEndY >= secondStartY && firstEndY <= secondEndY;
   return (overlapXStart || overlapXEnd) && (overlapYStart || overlapYEnd);
 }
 
 bool MoveVector::include(const qc::MoveVector& other) const {
-  auto includeX =
-      std::signbit(xStart - other.xStart) != std::signbit(xEnd - other.xEnd);
-  auto includeY =
-      std::signbit(yStart - other.yStart) != std::signbit(yEnd - other.yEnd);
-  return includeX && includeY;
+  const auto firstStartX  = std::min(xStart, xEnd);
+  const auto firstEndX    = std::max(xStart, xEnd);
+  const auto secondStartX = std::min(other.xStart, other.xEnd);
+  const auto secondEndX   = std::max(other.xStart, other.xEnd);
+  const auto firstStartY  = std::min(yStart, yEnd);
+  const auto firstEndY    = std::max(yStart, yEnd);
+  const auto secondStartY = std::min(other.yStart, other.yEnd);
+  const auto secondEndY   = std::max(other.yStart, other.yEnd);
+
+  const auto includeX =
+      (secondStartX < firstStartX) && (firstEndX < secondEndX);
+  const auto includeY =
+      (secondStartY < firstStartY) && (firstEndY < secondEndY);
+
+  return includeX || includeY;
 }
 
 void MoveCombs::addMoveComb(const qc::MoveComb& otherMove) {

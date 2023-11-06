@@ -15,19 +15,20 @@
 namespace qc {
 
 using GateList = std::set<std::unique_ptr<qc::Operation>*>;
+
+struct MapperParameters {
+  fp lookaheadWeightSwaps          = 0.1;
+  fp lookaheadWeightMoves          = 0.1;
+  fp decay                         = 0.1;
+  fp shuttlingTimeWeight           = 1;
+  fp shuttlingMakeExecutableBonus  = 1;
+  fp multiQubitGateWeight          = 1;
+  fp multiQubitGateWeightShuttling = 1;
+  fp gateShuttlingWeight           = 1;
+};
+
 class NeutralAtomMapper {
 protected:
-  struct MapperParameters {
-    fp lookaheadWeightSwaps          = 0.1;
-    fp lookaheadWeightMoves          = 0.1;
-    fp decay                         = 0.1;
-    fp shuttlingTimeWeight           = 1;
-    fp shuttlingMakeExecutableBonus  = 1;
-    fp multiQubitGateWeight          = 1;
-    fp multiQubitGateWeightShuttling = 1;
-    fp gateShuttlingWeight           = 1;
-  };
-
   qc::NeutralAtomArchitecture                  arch;
   qc::QuantumComputation                       mappedQc;
   std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
@@ -142,7 +143,10 @@ public:
         hardwareQubits(arch, initialCoordinateMapping){};
 
   // Methods
-  QuantumComputation map(qc::QuantumComputation& qc);
+  QuantumComputation map(qc::QuantumComputation& qc,
+                         InitialMapping initialMapping, bool verbose = true);
+  QuantumComputation mapAod(qc::QuantumComputation& qc);
+  void setParameters(const MapperParameters& p) { this->parameters = p; }
 };
 
 } // namespace qc

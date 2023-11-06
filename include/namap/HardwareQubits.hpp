@@ -117,7 +117,7 @@ public:
   std::set<CoordIndex>    getNearbyOccupiedCoordinatesByCoord(CoordIndex idx);
   fp                      getTotalDistance(std::set<HwQubit>& qubits);
   std::set<HwQubit>       getBlockedQubits(const std::set<HwQubit>& qubits);
-  std::vector<CoordIndex> findClosestFreeCoord(HwQubit               qubit,
-                                               MoveVector::Direction direction);
+  std::vector<CoordIndex> findClosestFreeCoord(HwQubit   qubit,
+                                               Direction direction);
 };
 } // namespace qc

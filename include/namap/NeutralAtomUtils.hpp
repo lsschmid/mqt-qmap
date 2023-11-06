@@ -54,22 +54,24 @@ public:
 enum InitialCoordinateMapping { Trivial, Random };
 enum InitialMapping { Identity };
 
+struct Direction {
+  bool x;
+  bool y;
+
+  Direction(bool x, bool y) : x(x), y(y) {}
+  Direction(fp deltaX, fp deltaY) : x(deltaX >= 0), y(deltaY >= 0) {}
+
+  [[nodiscard]] inline bool operator==(const Direction& other) const {
+    return x == other.x && y == other.y;
+  }
+  [[nodiscard]] inline bool operator!=(const Direction& other) const {
+    return !(*this == other);
+  }
+  [[nodiscard]] inline int32_t getSignX() const { return x ? 1 : -1; }
+  [[nodiscard]] inline int32_t getSignY() const { return y ? 1 : -1; }
+};
+
 struct MoveVector {
-  struct Direction {
-    bool x;
-    bool y;
-
-    Direction(bool x, bool y) : x(x), y(y) {}
-    Direction(fp deltaX, fp deltaY) : x(deltaX >= 0), y(deltaY >= 0) {}
-
-    [[nodiscard]] inline bool operator==(const Direction& other) const {
-      return x == other.x && y == other.y;
-    }
-    [[nodiscard]] inline bool operator!=(const Direction& other) const {
-      return !(*this == other);
-    }
-  };
-
   fp        xStart;
   fp        yStart;
   fp        xEnd;
@@ -148,5 +150,58 @@ struct MoveCombs {
   void removeAllWithSameStart(const MoveComb& moveComb);
   void removeAllWithSameEnd(const MoveComb& moveComb);
 };
+
+class Coordinate {
+protected:
+  std::uint32_t x;
+  std::uint32_t y;
+
+public:
+  Coordinate() = default;
+  Coordinate(CoordIndex x, CoordIndex y) : x(x), y(y) {}
+
+  [[nodiscard]] inline CoordIndex getX() const { return x; }
+  [[nodiscard]] inline CoordIndex getY() const { return y; }
+  [[nodiscard]] inline fp         getXfp() const { return static_cast<fp>(x); }
+  [[nodiscard]] inline fp         getYfp() const { return static_cast<fp>(y); }
+  [[nodiscard]] inline std::pair<CoordIndex, CoordIndex> getXY() const {
+    return std::make_pair(x, y);
+  }
+  [[nodiscard]] inline fp getEuclidianDistance(const Coordinate& c) const {
+    return std::sqrt(std::pow(static_cast<fp>(x) - static_cast<fp>(c.x), 2) +
+                     std::pow(static_cast<fp>(y) - static_cast<fp>(c.y), 2));
+  }
+  [[nodiscard]] static inline bool sameX(const Coordinate& c1,
+                                         const Coordinate& c2) {
+    return c1.x == c2.x;
+  }
+  [[nodiscard]] static inline bool sameY(const Coordinate& c1,
+                                         const Coordinate& c2) {
+    return c1.y == c2.y;
+  }
+  [[nodiscard]] static inline bool sameXorY(const Coordinate& c1,
+                                            const Coordinate& c2) {
+    return sameX(c1, c2) || sameY(c1, c2);
+  }
+
+  [[nodiscard]] inline CoordIndex
+  getManhattenDistanceX(const Coordinate& c) const {
+    if (x > c.x) {
+      return x - c.x;
+    } else {
+      return c.x - x;
+    }
+  }
+  [[nodiscard]] inline CoordIndex
+  getManhattenDistanceY(const Coordinate& c) const {
+    if (y > c.y) {
+      return y - c.y;
+    } else {
+      return c.y - y;
+    }
+  }
+};
+
+enum class Dimension { X, Y };
 
 } // namespace qc

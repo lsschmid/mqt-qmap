@@ -4,7 +4,6 @@
 
 #pragma once
 
-#include "ShuttlingOperation.hpp"
 #include "namap/NeutralAtomDefinitions.hpp"
 #include "namap/NeutralAtomUtils.hpp"
 #include "utils.hpp"
@@ -17,49 +16,12 @@
 
 namespace qc {
 class NeutralAtomArchitecture {
-  class Coordinate {
-  protected:
-    std::uint32_t x;
-    std::uint32_t y;
-
-  public:
-    Coordinate() = default;
-    Coordinate(CoordIndex x, CoordIndex y) : x(x), y(y) {}
-
-    [[nodiscard]] inline CoordIndex getX() const { return x; }
-    [[nodiscard]] inline CoordIndex getY() const { return y; }
-    [[nodiscard]] inline fp getXfp() const { return static_cast<fp>(x); }
-    [[nodiscard]] inline fp getYfp() const { return static_cast<fp>(y); }
-    [[nodiscard]] inline std::pair<CoordIndex, CoordIndex> getXY() const {
-      return std::make_pair(x, y);
-    }
-    [[nodiscard]] inline fp getEuclidianDistance(const Coordinate& c) const {
-      return std::sqrt(std::pow(static_cast<fp>(x) - static_cast<fp>(c.x), 2) +
-                       std::pow(static_cast<fp>(y) - static_cast<fp>(c.y), 2));
-    }
-    [[nodiscard]] inline CoordIndex
-    getManhattenDistanceX(const Coordinate& c) const {
-      if (x > c.x) {
-        return x - c.x;
-      } else {
-        return c.x - x;
-      }
-    }
-    [[nodiscard]] inline CoordIndex
-    getManhattenDistanceY(const Coordinate& c) const {
-      if (y > c.y) {
-        return y - c.y;
-      } else {
-        return c.y - y;
-      }
-    }
-  };
-
   class Properties {
   protected:
     std::uint16_t nRows;
     std::uint16_t nColumns;
     std::uint16_t nAods;
+    std::uint16_t nAodIntermediateLevels;
     std::uint16_t nAodCoordinates;
     fp            interQubitDistance;
     fp            interactionRadius;
@@ -69,8 +31,10 @@ class NeutralAtomArchitecture {
     Properties() = default;
     Properties(std::uint16_t nRows, std::uint16_t nColumns, std::uint16_t nAods,
                std::uint16_t nAodCoordinates, fp interQubitDistance,
-               fp interactionRadius, fp blockingFactor)
+               fp interactionRadius, fp blockingFactor, fp aodDistance)
         : nRows(nRows), nColumns(nColumns), nAods(nAods),
+          nAodIntermediateLevels(
+              static_cast<uint16_t>(interQubitDistance / aodDistance)),
           nAodCoordinates(nAodCoordinates),
           interQubitDistance(interQubitDistance),
           interactionRadius(interactionRadius), blockingFactor(blockingFactor) {
@@ -83,6 +47,9 @@ class NeutralAtomArchitecture {
     [[nodiscard]] inline std::uint16_t getNAods() const { return nAods; }
     [[nodiscard]] inline std::uint16_t getNAodCoordinates() const {
       return nAodCoordinates;
+    }
+    [[nodiscard]] inline std::uint16_t getNAodIntermediateLevels() const {
+      return nAodIntermediateLevels;
     }
     [[nodiscard]] inline fp getInterQubitDistance() const {
       return interQubitDistance;
@@ -168,6 +135,10 @@ public:
                                           const Coordinate& c2) const {
     return swapDistances(c1.getX() + c1.getY() * properties.getNcolumns(),
                          c2.getX() + c2.getY() * properties.getNcolumns());
+  }
+
+  [[nodiscard]] inline uint16_t getNAodIntermediateLevels() const {
+    return properties.getNAodIntermediateLevels();
   }
 
   [[nodiscard]] inline fp getGateTime(OpType opType) const {

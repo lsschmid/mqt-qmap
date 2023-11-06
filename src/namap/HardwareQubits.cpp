@@ -196,8 +196,7 @@ HardwareQubits::getNearbyOccupiedCoordinatesByCoord(qc::CoordIndex idx) {
 }
 
 std::vector<CoordIndex>
-HardwareQubits::findClosestFreeCoord(CoordIndex            coord,
-                                     MoveVector::Direction direction) {
+HardwareQubits::findClosestFreeCoord(CoordIndex coord, Direction direction) {
   // return the closest free coord in general
   // and the closest free coord in the given direction
   std::vector<CoordIndex> closestFreeCoords;
