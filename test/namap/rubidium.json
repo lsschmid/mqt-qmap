@@ -6,6 +6,7 @@
     "nAods": 2,
     "nAodCoordinates": 2,
     "interQubitDistance": 0.574,
+    "minimalAodDistance": 0.1,
     "interactionRadius": 1.5,
     "blockingFactor": 1
   },
