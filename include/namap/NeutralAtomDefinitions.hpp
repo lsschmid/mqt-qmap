@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "operations/AodOperation.hpp"
 #include "utils.hpp"
 
 namespace qc {
@@ -15,6 +16,6 @@ using Qubits      = std::set<Qubit>;
 using HwQubits    = std::set<HwQubit>;
 using HwPositions = std::vector<HwQubits>;
 using SwapOrMove  = std::pair<HwQubit, HwQubit>;
-using OpPointer   = std::unique_ptr<Operation>;
+using OpPointer   = std::unique_ptr<AodOperation>;
 
 } // namespace qc

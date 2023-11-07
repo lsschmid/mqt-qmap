@@ -202,6 +202,4 @@ public:
   }
 };
 
-enum class Dimension { X, Y };
-
 } // namespace qc

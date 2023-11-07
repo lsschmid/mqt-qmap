@@ -23,6 +23,10 @@ QuantumComputation AodScheduler::schedule(QuantumComputation& qc) {
       for (auto& aodOp : groupIt->processedOpsInit) {
         qcScheduled.emplace_back(aodOp->clone());
       }
+      qcScheduled.emplace_back(groupIt->processedOpShuttle->clone());
+      for (auto& aodOp : groupIt->processedOpsFinal) {
+        qcScheduled.emplace_back(aodOp->clone());
+      }
       groupIt++;
     } else if (op->getType() != OpType::Move) {
       qcScheduled.emplace_back(op->clone());
@@ -261,29 +265,79 @@ void AodScheduler::processMoveGroups() {
   for (auto groupIt = moveGroups.begin(); groupIt != moveGroups.end();
        ++groupIt) {
     auto&               moveGroup = *groupIt;
-    AodActivationHelper aodActivationHelper{arch};
-    AodActivationHelper aodDeactivationHelper{arch};
+    AodActivationHelper aodActivationHelper{arch, OpType::AodActivate};
+    AodActivationHelper aodDeactivationHelper{arch, OpType::AodDeactivate};
     MoveGroup           possibleNewMoveGroup{arch};
     for (auto& movePair : moveGroup.moves) {
       auto& move     = movePair.first;
       auto  idx      = movePair.second;
       auto  origin   = arch.getCoordinate(move.first);
+      auto  target   = arch.getCoordinate(move.second);
       auto  v        = arch.getVector(move.first, move.second);
-      auto  canAddXY = aodActivationHelper.canAddActivation(origin, move, v);
-      if (canAddXY.first == ActivationMerge::Impossible ||
-          canAddXY.second == ActivationMerge::Impossible) {
+      auto  vReverse = arch.getVector(move.second, move.first);
+      auto  activationCanAddXY =
+          aodActivationHelper.canAddActivation(origin, move, v);
+      auto deactivationCanAddXY =
+          aodDeactivationHelper.canAddActivation(target, move, vReverse);
+      if (activationCanAddXY.first == ActivationMerge::Impossible ||
+          activationCanAddXY.second == ActivationMerge::Impossible ||
+          deactivationCanAddXY.first == ActivationMerge::Impossible ||
+          deactivationCanAddXY.second == ActivationMerge::Impossible) {
         // move could not be added as not sufficient intermediate levels
         // add new move group and add move to it
         possibleNewMoveGroup.add(move, idx);
       } else {
-        aodActivationHelper.addActivation(canAddXY, origin, move, v);
+        aodActivationHelper.addActivation(activationCanAddXY, origin, move, v);
+        aodDeactivationHelper.addActivation(deactivationCanAddXY, target, move,
+                                            vReverse);
       }
     }
     if (!possibleNewMoveGroup.moves.empty()) {
       groupIt = moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
     }
-    groupIt->processedOpsInit = aodActivationHelper.getAodOperations();
+    groupIt->processedOpsInit   = aodActivationHelper.getAodOperations();
+    groupIt->processedOpsFinal  = aodDeactivationHelper.getAodOperations();
+    groupIt->processedOpShuttle = MoveGroup::connectAodOperations(
+        groupIt->processedOpsInit, groupIt->processedOpsFinal);
   }
+}
+
+OpPointer AodScheduler::MoveGroup::connectAodOperations(
+    const std::vector<OpPointer>& opsInit,
+    const std::vector<OpPointer>& opsFinal) {
+  // for each init operation find the corresponding final operation
+  // and connect with an aod move operations
+  // all can be done in parallel in a single move
+  std::vector<SingleOperation> aodOperations;
+  std::vector<CoordIndex>      targetQubits;
+
+  for (const auto& opInit : opsInit) {
+    if (opInit->getType() == OpType::AodMove) {
+      for (const auto& opFinal : opsFinal) {
+        if (opInit->getType() == OpType::AodMove) {
+          if (opInit->getTargets()[0] == opFinal->getTargets()[0] &&
+              opInit->getTargets()[1] == opFinal->getTargets()[1]) {
+            targetQubits.push_back(opInit->getTargets()[0]);
+            targetQubits.push_back(opInit->getTargets()[1]);
+            // found corresponding final operation
+            // connect with aod move
+            const auto startX = opInit->getEnds(Dimension::X)[0];
+            const auto endX   = opFinal->getEnds(Dimension::X)[0];
+            if (startX != endX) {
+              aodOperations.emplace_back(Dimension::X, startX, endX);
+            }
+            const auto startY = opInit->getEnds(Dimension::Y)[0];
+            const auto endY   = opFinal->getEnds(Dimension::Y)[0];
+            if (startY != endY) {
+              aodOperations.emplace_back(Dimension::Y, startY, endY);
+            }
+          }
+        }
+      }
+    }
+  }
+  return std::make_unique<AodOperation>(OpType::AodMove, targetQubits,
+                                        aodOperations);
 }
 
 std::vector<AodScheduler::AodActivationHelper::AodMove*>
@@ -362,7 +416,7 @@ void AodScheduler::AodActivationHelper::mergeActivation(
 std::pair<OpPointer, OpPointer>
 AodScheduler::AodActivationHelper::getAodOperation(
     const AodActivationHelper::AodActivation& activation,
-    const NeutralAtomArchitecture&            arch) {
+    const NeutralAtomArchitecture& arch, OpType type) {
   std::vector<CoordIndex> qubitsActivation;
   qubitsActivation.reserve(activation.moves.size());
   for (const auto& move : activation.moves) {
@@ -381,41 +435,46 @@ AodScheduler::AodActivationHelper::getAodOperation(
     }
   }
 
-  std::vector<std::tuple<uint32_t, fp, fp>> initOperations;
-  std::vector<std::tuple<uint32_t, fp, fp>> offsetOperations;
+  std::vector<SingleOperation> initOperations;
+  std::vector<SingleOperation> offsetOperations;
 
   auto d      = arch.getInterQubitDistance();
   auto interD = arch.getInterQubitDistance() / arch.getNAodIntermediateLevels();
 
   for (const auto& aodMove : activation.activateXs) {
-    initOperations.emplace_back(0, static_cast<fp>(aodMove->init) * d,
+    initOperations.emplace_back(Dimension::X,
+                                static_cast<fp>(aodMove->init) * d,
                                 static_cast<fp>(aodMove->init) * d);
-    offsetOperations.emplace_back(0, static_cast<fp>(aodMove->init) * d,
-                                  static_cast<fp>(aodMove->init) * d +
-                                      static_cast<fp>(aodMove->offset) *
-                                          interD);
+    offsetOperations.emplace_back(
+        Dimension::X, static_cast<fp>(aodMove->init) * d,
+        static_cast<fp>(aodMove->init) * d +
+            static_cast<fp>(aodMove->offset) * interD);
   }
   for (const auto& aodMove : activation.activateYs) {
-    initOperations.emplace_back(1, static_cast<fp>(aodMove->init) * d,
+    initOperations.emplace_back(Dimension::Y,
+                                static_cast<fp>(aodMove->init) * d,
                                 static_cast<fp>(aodMove->init) * d);
-    offsetOperations.emplace_back(1, static_cast<fp>(aodMove->init) * d,
-                                  static_cast<fp>(aodMove->init) * d +
-                                      static_cast<fp>(aodMove->offset) *
-                                          interD);
+    offsetOperations.emplace_back(
+        Dimension::Y, static_cast<fp>(aodMove->init) * d,
+        static_cast<fp>(aodMove->init) * d +
+            static_cast<fp>(aodMove->offset) * interD);
   }
 
-  auto initOp = std::make_unique<AodOperation>(
-      OpType::AodActivate, qubitsActivation, initOperations);
+  auto initOp =
+      std::make_unique<AodOperation>(type, qubitsActivation, initOperations);
   auto offsetOp = std::make_unique<AodOperation>(OpType::AodMove, qubitsMove,
                                                  offsetOperations);
-  return std::make_pair(std::move(initOp), std::move(offsetOp));
+  if (type == OpType::AodActivate) {
+    return std::make_pair(std::move(initOp), std::move(offsetOp));
+  }
+  return std::make_pair(std::move(offsetOp), std::move(initOp));
 }
 
 std::vector<OpPointer>
 AodScheduler::AodActivationHelper::getAodOperations() const {
   std::vector<OpPointer> aodOperations;
   for (const auto& activation : allActivations) {
-    auto [initOp, offsetOp] = getAodOperation(activation, arch);
+    auto [initOp, offsetOp] = getAodOperation(activation, arch, type);
     aodOperations.emplace_back(std::move(initOp));
     aodOperations.emplace_back(std::move(offsetOp));
   }

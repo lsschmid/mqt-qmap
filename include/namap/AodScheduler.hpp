@@ -54,6 +54,7 @@ protected:
 
     NeutralAtomArchitecture    arch;
     std::vector<AodActivation> allActivations;
+    OpType                     type;
 
     [[nodiscard]] std::vector<AodMove*> getAodMoves(Dimension dim,
                                                     uint32_t  x) const;
@@ -78,16 +79,19 @@ protected:
 
     [[nodiscard]] static std::pair<OpPointer, OpPointer>
     getAodOperation(const AodActivation&           activation,
-                    const NeutralAtomArchitecture& arch);
+                    const NeutralAtomArchitecture& arch, OpType type);
     [[nodiscard]] std::vector<OpPointer> getAodOperations() const;
 
-    AodActivationHelper(NeutralAtomArchitecture arch) : arch(std::move(arch)) {}
+    AodActivationHelper(NeutralAtomArchitecture arch, OpType type)
+        : arch(std::move(arch)), type(type) {}
   };
 
   struct MoveGroup {
     NeutralAtomArchitecture                    arch;
     std::vector<std::pair<AtomMove, uint32_t>> moves;
     std::vector<OpPointer>                     processedOpsInit;
+    std::vector<OpPointer>                     processedOpsFinal;
+    OpPointer                                  processedOpShuttle;
     std::vector<CoordIndex>                    targetQubits;
     std::vector<CoordIndex>                    qubitsUsedByGates;
 
@@ -98,6 +102,10 @@ protected:
     }
     [[nodiscard]] inline bool isFirstOpSet() const { return !moves.empty(); }
     static bool parallelCheck(const MoveVector& v1, const MoveVector& v2);
+
+    static OpPointer
+    connectAodOperations(const std::vector<OpPointer>& opsInit,
+                         const std::vector<OpPointer>& opsFinal);
 
     MoveGroup(NeutralAtomArchitecture arch) : arch(std::move(arch)) {}
   };
