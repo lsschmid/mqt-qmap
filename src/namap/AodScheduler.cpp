@@ -20,11 +20,11 @@ QuantumComputation AodScheduler::schedule(QuantumComputation& qc) {
   for (const auto& op : qc) {
     if (groupIt != moveGroups.end() && idx == groupIt->getFirstIdx()) {
       // add move group
-      for (auto& aodOp : groupIt->processedOps) {
+      for (auto& aodOp : groupIt->processedOpsInit) {
         qcScheduled.emplace_back(aodOp->clone());
       }
       groupIt++;
-    } else {
+    } else if (op->getType() != OpType::Move) {
       qcScheduled.emplace_back(op->clone());
     }
     idx++;
@@ -47,6 +47,14 @@ void AodScheduler::initMoveGroups(QuantumComputation& qc) {
         currentMoveGroup = MoveGroup{arch};
         currentMoveGroup.add(move, idx);
       }
+    } else if (op->getNqubits() > 1) {
+      for (const auto& qubit : op->getUsedQubits()) {
+        if (std::find(currentMoveGroup.targetQubits.begin(),
+                      currentMoveGroup.targetQubits.end(),
+                      qubit) == currentMoveGroup.targetQubits.end()) {
+          currentMoveGroup.qubitsUsedByGates.push_back(qubit);
+        }
+      }
     }
     idx++;
   }
@@ -56,6 +64,12 @@ void AodScheduler::initMoveGroups(QuantumComputation& qc) {
 }
 
 bool AodScheduler::MoveGroup::canAdd(const AtomMove& move) {
+  // if move wourld move a qubit that is used by a gate in this move group
+  // return false
+  if (std::find(qubitsUsedByGates.begin(), qubitsUsedByGates.end(),
+                move.first) != qubitsUsedByGates.end()) {
+    return false;
+  }
   // checks if the op can be executed in parallel
   auto moveVector = arch.getVector(move.first, move.second);
   return std::all_of(
@@ -85,97 +99,146 @@ bool AodScheduler::MoveGroup::parallelCheck(const MoveVector& v1,
 
 void AodScheduler::MoveGroup::add(const AtomMove& move, const uint32_t idx) {
   moves.emplace_back(move, idx);
+  targetQubits.push_back(move.second);
 }
 
-bool AodScheduler::AodActivationHelper::addActivation(const Coordinate& origin,
-                                                      const AtomMove&   move,
-                                                      MoveVector        v) {
-  const auto          x         = origin.getX();
-  const auto          y         = origin.getY();
-  const auto          signX     = v.direction.getSignX();
-  const auto          signY     = v.direction.getSignY();
-  const auto          deltaX    = v.xEnd - v.xStart;
-  const auto          deltaY    = v.yEnd - v.yStart;
-  auto                aodMovesX = getAodMoves(Dimension::X, x);
-  auto                aodMovesY = getAodMoves(Dimension::Y, y);
-  AodActivation const newActivationPair{
-      {x, deltaX, signX}, {y, deltaY, signY}, move};
-  if (aodMovesX.empty() && aodMovesY.empty()) {
-    // create new activation
-    allActivations.push_back(newActivationPair);
-    return true;
-  }
-  if (aodMovesY.empty()) {
-    // check if it can be combined with existing activations
-    for (auto* aodMove : aodMovesX) {
-      if (aodMove->init == x && aodMove->delta == deltaX &&
-          aodMove->offset == signX) {
-        // combine activations
-        mergeActivation(Dimension::X, newActivationPair);
-        return true;
-      }
-    }
+void AodScheduler::AodActivationHelper::addActivation(
+    std::pair<ActivationMerge, ActivationMerge> merge, const Coordinate& origin,
+    const AtomMove& move, MoveVector v) {
+  const auto x      = origin.getX();
+  const auto y      = origin.getY();
+  const auto signX  = v.direction.getSignX();
+  const auto signY  = v.direction.getSignY();
+  const auto deltaX = v.xEnd - v.xStart;
+  const auto deltaY = v.yEnd - v.yStart;
+  //  AodActivation const newActivationPair{
+  //      {x, deltaX, signX}, {y, deltaY, signY}, move};
+  //  allActivations.push_back(newActivationPair);
+  //  mergeActivation(Dimension::X, newActivationPair);
+  //  reAssignOffsets(aodMovesX, signX);
+  auto aodMovesX = getAodMoves(Dimension::X, x);
+  auto aodMovesY = getAodMoves(Dimension::Y, y);
 
-    // check if increase in x direction possible
-    if (!checkIntermediateSpace(Dimension::X, x, signX)) {
-      return false;
+  switch (merge.first) {
+  case ActivationMerge::Trivial:
+    switch (merge.second) {
+    case ActivationMerge::Trivial:
+      allActivations.emplace_back(
+          AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
+      break;
+    case ActivationMerge::Merge:
+      allActivations.emplace_back(
+          AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      mergeActivation(Dimension::Y,
+                      AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      break;
+    case ActivationMerge::Append:
+      allActivations.emplace_back(
+          AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
+      aodMovesY = getAodMoves(Dimension::Y, y);
+      reAssignOffsets(aodMovesY, signY);
+      break;
+    default:
+      break;
     }
-    allActivations.push_back(newActivationPair);
-    // sort aodMovesX by delta and assign offset
-    reAssignOffsets(aodMovesX, signX);
-    return true;
+    break;
+  case ActivationMerge::Merge:
+    switch (merge.second) {
+    case ActivationMerge::Trivial:
+      allActivations.emplace_back(
+          AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      mergeActivation(Dimension::X,
+                      AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      break;
+    case ActivationMerge::Merge:
+      mergeActivation(Dimension::X,
+                      AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      mergeActivation(Dimension::Y,
+                      AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      break;
+    case ActivationMerge::Append:
+      mergeActivation(Dimension::X,
+                      AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      allActivations.emplace_back(
+          AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      aodMovesY = getAodMoves(Dimension::Y, y);
+      reAssignOffsets(aodMovesY, signY);
+      break;
+    default:
+      break;
+    }
+    break;
+  case ActivationMerge::Append:
+    switch (merge.second) {
+    case ActivationMerge::Trivial:
+      allActivations.emplace_back(
+          AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
+      aodMovesX = getAodMoves(Dimension::X, x);
+      reAssignOffsets(aodMovesX, signX);
+      break;
+    case ActivationMerge::Merge:
+      allActivations.emplace_back(
+          AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      aodMovesX = getAodMoves(Dimension::X, x);
+      reAssignOffsets(aodMovesX, signX);
+      mergeActivation(Dimension::Y,
+                      AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      break;
+    case ActivationMerge::Append:
+      allActivations.emplace_back(
+          AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
+      aodMovesX = getAodMoves(Dimension::X, x);
+      reAssignOffsets(aodMovesX, signX);
+      aodMovesY = getAodMoves(Dimension::Y, y);
+      reAssignOffsets(aodMovesY, signY);
+      break;
+    default:
+      break;
+    }
+    break;
+  default:
+    break;
   }
-  if (aodMovesX.empty()) {
-    // check if it can be combined with existing activations
-    for (auto* aodMove : aodMovesY) {
-      if (aodMove->init == y && aodMove->delta == deltaY &&
-          aodMove->offset == signY) {
-        // combine activations
-        mergeActivation(Dimension::Y, newActivationPair);
-        return true;
-      }
-    }
+}
 
-    // check if increase in y direction possible
-    if (!checkIntermediateSpace(Dimension::Y, y, signY)) {
-      return false;
-    }
-    allActivations.push_back(newActivationPair);
-    // sort aodMovesY by delta and assign offset
-    reAssignOffsets(aodMovesY, signY);
-    return true;
+std::pair<ActivationMerge, ActivationMerge>
+AodScheduler::AodActivationHelper::canAddActivation(
+    const qc::Coordinate& origin, const qc::AtomMove& move,
+    qc::MoveVector v) const {
+  auto aodMovesX = getAodMoves(Dimension::X, origin.getX());
+  auto aodMovesY = getAodMoves(Dimension::Y, origin.getY());
+
+  auto const canX = canMergeActivation(Dimension::X, origin, move, v);
+  auto const canY = canMergeActivation(Dimension::Y, origin, move, v);
+  return std::make_pair(canX, canY);
+}
+
+ActivationMerge AodScheduler::AodActivationHelper::canMergeActivation(
+    Dimension dim, const Coordinate& origin, const AtomMove& move,
+    MoveVector v) const {
+  auto x = dim == Dimension::X ? origin.getX() : origin.getY();
+  auto sign =
+      dim == Dimension::X ? v.direction.getSignX() : v.direction.getSignY();
+  auto delta    = dim == Dimension::X ? v.xEnd - v.xStart : v.yEnd - v.yStart;
+  auto aodMoves = getAodMoves(dim, x);
+  if (aodMoves.empty()) {
+    // return false as no merge is required
+    return ActivationMerge::Trivial;
   }
   // check if it can be combined with existing activations
-  bool combinedX = false;
-  bool combinedY = false;
+  for (auto* aodMove : aodMoves) {
+    if (aodMove->init == x && aodMove->delta == delta &&
+        aodMove->offset == sign) {
+      // combine activations
+      return ActivationMerge::Merge;
+    }
+  }
 
-  for (auto* aodMove : aodMovesX) {
-    if (aodMove->init == x && aodMove->delta == deltaX &&
-        aodMove->offset == signX) {
-      // combine activations
-      mergeActivation(Dimension::X, newActivationPair);
-      combinedX = true;
-    }
+  // check if increase in x direction possible
+  if (checkIntermediateSpace(dim, x, sign)) {
+    return ActivationMerge::Append;
   }
-  for (auto* aodMove : aodMovesY) {
-    if (aodMove->init == y && aodMove->delta == deltaY &&
-        aodMove->offset == signY) {
-      // combine activations
-      mergeActivation(Dimension::Y, newActivationPair);
-      combinedY = true;
-    }
-  }
-  if (combinedX && combinedY) {
-    return true;
-  }
-  if (!checkIntermediateSpace(Dimension::X, x, signX) ||
-      !checkIntermediateSpace(Dimension::Y, y, signY)) {
-    return false;
-  }
-  allActivations.push_back(newActivationPair);
-  reAssignOffsets(aodMovesX, signX);
-  reAssignOffsets(aodMovesY, signY);
-  return true;
+  return ActivationMerge::Impossible;
 }
 
 void AodScheduler::AodActivationHelper::reAssignOffsets(
@@ -202,20 +265,24 @@ void AodScheduler::processMoveGroups() {
     AodActivationHelper aodDeactivationHelper{arch};
     MoveGroup           possibleNewMoveGroup{arch};
     for (auto& movePair : moveGroup.moves) {
-      auto& move   = movePair.first;
-      auto  idx    = movePair.second;
-      auto  origin = arch.getCoordinate(move.first);
-      auto  v      = arch.getVector(move.first, move.second);
-      if (!aodActivationHelper.addActivation(origin, move, v)) {
+      auto& move     = movePair.first;
+      auto  idx      = movePair.second;
+      auto  origin   = arch.getCoordinate(move.first);
+      auto  v        = arch.getVector(move.first, move.second);
+      auto  canAddXY = aodActivationHelper.canAddActivation(origin, move, v);
+      if (canAddXY.first == ActivationMerge::Impossible ||
+          canAddXY.second == ActivationMerge::Impossible) {
         // move could not be added as not sufficient intermediate levels
         // add new move group and add move to it
         possibleNewMoveGroup.add(move, idx);
+      } else {
+        aodActivationHelper.addActivation(canAddXY, origin, move, v);
       }
     }
     if (!possibleNewMoveGroup.moves.empty()) {
       groupIt = moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
     }
-    groupIt->processedOps = aodActivationHelper.getAodOperations();
+    groupIt->processedOpsInit = aodActivationHelper.getAodOperations();
   }
 }
 
@@ -266,13 +333,14 @@ bool AodScheduler::AodActivationHelper::checkIntermediateSpace(
     return true;
   }
   if (aodMoves.empty()) {
-    return getMaxOffset(dim, neighborX, sign) < nIntermediateLevels;
+    return getMaxOffset(dim, neighborX, sign) <
+           arch.getNAodIntermediateLevels();
   }
   if (aodMovesNeighbor.empty()) {
-    return getMaxOffset(dim, x, sign) < nIntermediateLevels;
+    return getMaxOffset(dim, x, sign) < arch.getNAodIntermediateLevels();
   }
   return getMaxOffset(dim, x, sign) + getMaxOffset(dim, neighborX, sign) <
-         nIntermediateLevels;
+         arch.getNAodIntermediateLevels();
 }
 
 void AodScheduler::AodActivationHelper::mergeActivation(
@@ -285,13 +353,6 @@ void AodScheduler::AodActivationHelper::mergeActivation(
           aodMove->delta == activation.getActivates(dim)[0]->delta &&
           aodMove->offset == activation.getActivates(dim)[0]->offset) {
         activationCurrent.moves.push_back(activation.moves[0]);
-        Dimension const otherDim =
-            dim == Dimension::X ? Dimension::Y : Dimension::X;
-        auto* addedAodMove = activation.getActivates(otherDim)[0];
-        activationCurrent.addAodMove(otherDim, *addedAodMove);
-        // sort aodMovesY by delta and assign offset
-        auto aodMoves = getAodMoves(otherDim, addedAodMove->init);
-        reAssignOffsets(aodMoves, addedAodMove->offset);
         return;
       }
     }
@@ -310,8 +371,14 @@ AodScheduler::AodActivationHelper::getAodOperation(
   std::vector<CoordIndex> qubitsMove;
   qubitsMove.reserve(activation.moves.size() * 2);
   for (const auto& move : activation.moves) {
-    qubitsMove.push_back(move.first);
-    qubitsMove.push_back(move.second);
+    if (std::find(qubitsMove.begin(), qubitsMove.end(), move.first) ==
+        qubitsMove.end()) {
+      qubitsMove.push_back(move.first);
+    }
+    if (std::find(qubitsMove.begin(), qubitsMove.end(), move.second) ==
+        qubitsMove.end()) {
+      qubitsMove.push_back(move.second);
+    }
   }
 
   std::vector<std::tuple<uint32_t, fp, fp>> initOperations;
