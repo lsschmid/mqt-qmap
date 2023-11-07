@@ -4,6 +4,7 @@
 
 #include "filesystem"
 #include "namap/NeutralAtomMapper.hpp"
+#include "namap/NeutralAtomScheduler.hpp"
 
 int main(int argc, char* argv[]) {
   if (argc != 16) {
@@ -70,6 +71,10 @@ int main(int argc, char* argv[]) {
     }
   }
 
+  // output file
+  std::ofstream ofsResults(output_directory + "/" + std::to_string(runIdx) +
+                           ".csv");
+
   for (const auto& qasmFile : qasmFiles) {
     // create arch
     qc::NeutralAtomArchitecture arch =
@@ -101,7 +106,12 @@ int main(int argc, char* argv[]) {
                           std::filesystem::path(qasmFile).filename().string() +
                           "_" + std::to_string(runIdx) + ".qasm_aod");
     qcAodMapped.dumpOpenQASM(ofs_aod);
-    // also dump the scheduler results later...
+    // do the scheduling
+    qc::NeutralAtomScheduler scheduler = qc::NeutralAtomScheduler(arch);
+    auto schedulerResults = scheduler.schedule(qcAodMapped, verbose);
+    // dump the results
+    ofsResults << std::filesystem::path(qasmFile).filename().string() + ", " +
+                      schedulerResults.toCsv() + "\n";
 
     // dump the parameters
     std::ofstream ofs_params(output_directory + "/parameters_" +

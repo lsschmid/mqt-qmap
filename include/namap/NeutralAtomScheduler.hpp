@@ -17,6 +17,25 @@ struct SchedulerResults {
                    fp totalFidelities)
       : totalExecutionTimes(std::move(totalExecutionTimes)),
         totalIdleTime(totalIdleTime), totalFidelities(totalFidelities) {}
+
+  std::string inline toString() {
+    std::stringstream ss;
+    ss << "Total execution times: ";
+    for (auto& time : totalExecutionTimes) {
+      ss << time << " ";
+    }
+    ss << "\nTotal idle time: " << totalIdleTime
+       << "\nTotal fidelities: " << totalFidelities;
+    return ss.str();
+  }
+  std::string inline toCsv() {
+    std::stringstream ss;
+    for (auto& time : totalExecutionTimes) {
+      ss << time << ",";
+    }
+    ss << totalIdleTime << "," << totalFidelities;
+    return ss.str();
+  }
 };
 
 class NeutralAtomScheduler {
