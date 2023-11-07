@@ -4,71 +4,44 @@
 
 #include "namap/NeutralAtomScheduler.hpp"
 
-void qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc,
-                                        bool isBlockedForAll) {
-  std::cout << "\n* schedule start!" << std::endl;
+#include "CircuitOptimizer.hpp"
+
+qc::SchedulerResults
+qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
+  CircuitOptimizer::decomposeSWAP(qc, false);
+  if (verbose) {
+    std::cout << "\n* schedule start!\n";
+  }
 
   int index = 0;
   for (auto& op : qc) {
-    std::cout << "\n" << index++ << std::endl;
-
-    auto   qubits = op->getUsedQubits();
-    double opTime, opFidelity;
-
-    // calculate time & fidelity
-    auto opType = op->getType();
-    if (opType == OpType::Move || opType == OpType::AodActivate ||
-        opType == OpType::AodDeactivate) { // shuttling
-      opTime     = arch.getShuttlingTime(op->getType());
-      opFidelity = arch.getShuttlingAverageFidelity(op->getType());
-    } else { // gate
-      opTime     = arch.getGateTime(op->getType());
-      opFidelity = arch.getGateAverageFidelity(op->getType());
+    index++;
+    if (verbose) {
+      std::cout << "\n" << index << "\n";
     }
+
+    auto qubits     = op->getUsedQubits();
+    auto opTime     = arch.getOpTime(op.get());
+    auto opFidelity = arch.getOpFidelity(op.get());
 
     // DEBUG info
-    std::cout << op->getName() << "  ";
-    printQubitsInfo(qubits, hardwareQubits);
-    std::cout << "-> time: " << opTime << ", fidelity: " << opFidelity
-              << std::endl;
-
-    // getBlockedQubits;
-    std::set<unsigned int> blockedQubits;
-    if (qubits.size() == 1) {
-      blockedQubits.insert(*qubits.begin());
-    } else {
-      blockedQubits = hardwareQubits.getBlockedQubits(qubits);
-    }
-    if (isBlockedForAll) {
-      for (uint32_t i = 0; i < arch.getNqubits(); i++) {
-        blockedQubits.insert(i);
+    if (verbose) {
+      std::cout << op->getName() << "  ";
+      for (const auto& qubit : qubits) {
+        std::cout << "q" << qubit << " ";
       }
+      std::cout << "-> time: " << opTime << ", fidelity: " << opFidelity
+                << "\n";
     }
 
-    /*
-    std::set<unsigned int> blockedQubits = qubits;
-    if(!arch.checkShuttlingType(op->getType()) && qubits.size()!=1){
-      for(auto q=0; q<arch.getNqubits(); q++){
-        auto qCoordIndex    = hardwareQubits.getCoordIndex(q);
-        for(auto& qubit : qubits){
-          if(q==qubit) continue;
+    auto blockedQubits = arch.getBlockedCoordIndices(op.get());
 
-          auto qubitCoordIndex    = hardwareQubits.getCoordIndex(qubit);
-          auto qubitDistance      = arch.getEuclidianDistance(qCoordIndex,
-    qubitCoordIndex); if(qubitDistance < arch.getInteractionRadius()){
-            blockedQubits.insert(q);
-          }
-        }
+    if (verbose) {
+      std::cout << "blockedQubits: ";
+      for (const auto& qubit : blockedQubits) {
+        std::cout << "q" << qubit << " ";
       }
     }
-    else if(arch.checkShuttlingType(op->getType()) && isBlockedForAll){
-      for(auto i=0; i<arch.getNqubits(); i++){
-        blockedQubits.insert(i);
-      }
-    }
-     */
-    std::cout << "blockedQubits: ";
-    printQubitsInfo(blockedQubits, hardwareQubits);
 
     // update totalExecutionTimes & totalIdleTime & totalFidelities
     auto maxQubit = *std::max_element(
@@ -82,9 +55,17 @@ void qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc,
       totalExecutionTimes[qubit] = maxTime + opTime;
     }
     totalFidelities *= opFidelity;
-    printTotalExecutionTimes(totalExecutionTimes);
+    if (verbose) {
+      std::cout << "\n";
+      printTotalExecutionTimes(totalExecutionTimes);
+    }
   }
-  printSchedulerResults(totalExecutionTimes, totalIdleTime, totalFidelities);
+  if (verbose) {
+    printSchedulerResults(totalExecutionTimes, totalIdleTime, totalFidelities);
+    std::cout << "\n* schedule end!\n";
+  }
+
+  return {totalExecutionTimes, totalIdleTime, totalFidelities};
 }
 
 void qc::NeutralAtomScheduler::printSchedulerResults(
@@ -92,25 +73,17 @@ void qc::NeutralAtomScheduler::printSchedulerResults(
     fp totalFidelities) {
   auto totalExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
-  std::cout << "\ntotalExecutionTimes: " << totalExecutionTime << std::endl;
-  std::cout << "totalIdleTime: " << totalIdleTime << std::endl;
-  std::cout << "totalFidelities: " << totalFidelities << std::endl;
+  std::cout << "\ntotalExecutionTimes: " << totalExecutionTime << "\n";
+  std::cout << "totalIdleTime: " << totalIdleTime << "\n";
+  std::cout << "totalFidelities: " << totalFidelities << "\n";
 }
 
 void qc::NeutralAtomScheduler::printTotalExecutionTimes(
     std::vector<fp>& totalExecutionTimes) {
-  std::cout << "ExecutionTime: " << std::endl;
+  std::cout << "ExecutionTime: "
+            << "\n";
   int i = 0;
   for (auto qubit : totalExecutionTimes) {
-    std::cout << "[" << i++ << "] " << qubit << std::endl;
+    std::cout << "[" << i++ << "] " << qubit << "\n";
   }
-}
-
-void qc::NeutralAtomScheduler::printQubitsInfo(
-    std::set<unsigned int> qubits, qc::HardwareQubits hardwareQubits) {
-  for (auto& qubit : qubits) {
-    std::cout << "q" << qubit << "{";
-    std::cout << hardwareQubits.getCoordIndex(qubit) << "}, ";
-  }
-  std::cout << std::endl;
 }

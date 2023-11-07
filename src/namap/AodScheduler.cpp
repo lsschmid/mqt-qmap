@@ -51,7 +51,7 @@ void AodScheduler::initMoveGroups(QuantumComputation& qc) {
         currentMoveGroup = MoveGroup{arch};
         currentMoveGroup.add(move, idx);
       }
-    } else if (op->getNqubits() > 1) {
+    } else if (op->getNqubits() > 1 && !currentMoveGroup.moves.empty()) {
       for (const auto& qubit : op->getUsedQubits()) {
         if (std::find(currentMoveGroup.targetQubits.begin(),
                       currentMoveGroup.targetQubits.end(),
@@ -264,10 +264,11 @@ void AodScheduler::processMoveGroups() {
   // convert the moves from MoveGroup to AodOperations
   for (auto groupIt = moveGroups.begin(); groupIt != moveGroups.end();
        ++groupIt) {
-    auto&               moveGroup = *groupIt;
-    AodActivationHelper aodActivationHelper{arch, OpType::AodActivate};
-    AodActivationHelper aodDeactivationHelper{arch, OpType::AodDeactivate};
-    MoveGroup           possibleNewMoveGroup{arch};
+    auto&                 moveGroup = *groupIt;
+    AodActivationHelper   aodActivationHelper{arch, OpType::AodActivate};
+    AodActivationHelper   aodDeactivationHelper{arch, OpType::AodDeactivate};
+    MoveGroup             possibleNewMoveGroup{arch};
+    std::vector<AtomMove> movesToRemove;
     for (auto& movePair : moveGroup.moves) {
       auto& move     = movePair.first;
       auto  idx      = movePair.second;
@@ -286,14 +287,26 @@ void AodScheduler::processMoveGroups() {
         // move could not be added as not sufficient intermediate levels
         // add new move group and add move to it
         possibleNewMoveGroup.add(move, idx);
+        movesToRemove.push_back(move);
       } else {
         aodActivationHelper.addActivation(activationCanAddXY, origin, move, v);
         aodDeactivationHelper.addActivation(deactivationCanAddXY, target, move,
                                             vReverse);
       }
-    }
-    if (!possibleNewMoveGroup.moves.empty()) {
-      groupIt = moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
+      // remove from current move group
+      for (const auto& moveToRemove : movesToRemove) {
+        moveGroup.moves.erase(
+            std::remove_if(moveGroup.moves.begin(), moveGroup.moves.end(),
+                           [&moveToRemove](const auto& movePair) {
+                             return movePair.first == moveToRemove;
+                           }),
+            moveGroup.moves.end());
+      }
+      if (!possibleNewMoveGroup.moves.empty()) {
+        groupIt =
+            moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
+        groupIt--;
+      }
     }
     groupIt->processedOpsInit   = aodActivationHelper.getAodOperations();
     groupIt->processedOpsFinal  = aodDeactivationHelper.getAodOperations();
@@ -321,15 +334,23 @@ OpPointer AodScheduler::MoveGroup::connectAodOperations(
             targetQubits.push_back(opInit->getTargets()[1]);
             // found corresponding final operation
             // connect with aod move
-            const auto startX = opInit->getEnds(Dimension::X)[0];
-            const auto endX   = opFinal->getEnds(Dimension::X)[0];
-            if (startX != endX) {
-              aodOperations.emplace_back(Dimension::X, startX, endX);
+            const auto startXs = opInit->getEnds(Dimension::X);
+            const auto endXs   = opFinal->getEnds(Dimension::X);
+            if (!startXs.empty() && !endXs.empty()) {
+              const auto startX = startXs[0];
+              const auto endX   = endXs[0];
+              if (startX != endX) {
+                aodOperations.emplace_back(Dimension::X, startX, endX);
+              }
             }
-            const auto startY = opInit->getEnds(Dimension::Y)[0];
-            const auto endY   = opFinal->getEnds(Dimension::Y)[0];
-            if (startY != endY) {
-              aodOperations.emplace_back(Dimension::Y, startY, endY);
+            const auto startYs = opInit->getEnds(Dimension::Y);
+            const auto endYs   = opFinal->getEnds(Dimension::Y);
+            if (!startYs.empty() && !endYs.empty()) {
+              const auto startY = startYs[0];
+              const auto endY   = endYs[0];
+              if (startY != endY) {
+                aodOperations.emplace_back(Dimension::Y, startY, endY);
+              }
             }
           }
         }
@@ -474,9 +495,9 @@ std::vector<OpPointer>
 AodScheduler::AodActivationHelper::getAodOperations() const {
   std::vector<OpPointer> aodOperations;
   for (const auto& activation : allActivations) {
-    auto [initOp, offsetOp] = getAodOperation(activation, arch, type);
-    aodOperations.emplace_back(std::move(initOp));
-    aodOperations.emplace_back(std::move(offsetOp));
+    auto operations = getAodOperation(activation, arch, type);
+    aodOperations.push_back(std::move(operations.first));
+    aodOperations.emplace_back(std::move(operations.second));
   }
   return aodOperations;
 }

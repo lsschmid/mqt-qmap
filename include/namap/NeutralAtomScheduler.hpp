@@ -8,27 +8,30 @@
 #include "namap/NeutralAtomArchitecture.hpp"
 
 namespace qc {
+struct SchedulerResults {
+  std::vector<fp> totalExecutionTimes;
+  fp              totalIdleTime;
+  fp              totalFidelities;
+
+  SchedulerResults(std::vector<fp> totalExecutionTimes, fp totalIdleTime,
+                   fp totalFidelities)
+      : totalExecutionTimes(std::move(totalExecutionTimes)),
+        totalIdleTime(totalIdleTime), totalFidelities(totalFidelities) {}
+};
 
 class NeutralAtomScheduler {
 protected:
   qc::NeutralAtomArchitecture arch;
-  qc::HardwareQubits          hardwareQubits;
   std::vector<fp>             totalExecutionTimes;
   fp                          totalIdleTime;
   fp                          totalFidelities;
 
 public:
-  [[nodiscard]] inline qc::NeutralAtomArchitecture getArchitecture() const {
-    return arch;
-  }
-
-  NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch,
-                       InitialCoordinateMapping initialCoordinateMapping)
-      : arch(arch), hardwareQubits(arch, initialCoordinateMapping),
-        totalExecutionTimes(std::vector<fp>(arch.getNqubits(), 0)),
+  NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch)
+      : arch(arch), totalExecutionTimes(std::vector<fp>(arch.getNqubits(), 0)),
         totalIdleTime(0), totalFidelities(1.0){};
 
-  void schedule(qc::QuantumComputation& qc, bool isBlockedForAll);
+  SchedulerResults schedule(qc::QuantumComputation& qc, bool verbose);
 
   static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
                                     fp totalIdleTime, fp totalFidelities);

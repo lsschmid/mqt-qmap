@@ -179,4 +179,51 @@ NeutralAtomArchitecture::getNN(qc::CoordIndex idx) const {
   return nn;
 }
 
+fp NeutralAtomArchitecture::getOpTime(const Operation* op) const {
+  if (op->getType() == OpType::AodActivate ||
+      op->getType() == OpType::AodDeactivate) {
+    return getShuttlingTime(op->getType());
+  }
+  if (op->getType() == OpType::AodMove) {
+    const auto  v         = this->parameters.shuttlingTimes.at(op->getType());
+    auto* const opAodMove = dynamic_cast<const AodOperation*>(op);
+    const auto  distanceX = opAodMove->getMaxDistance(Dimension::X);
+    const auto  distanceY = opAodMove->getMaxDistance(Dimension::Y);
+    return (distanceX + distanceY) / v;
+  }
+  return getGateTime(op->getType());
+}
+
+fp NeutralAtomArchitecture::getOpFidelity(const Operation* op) const {
+  if (op->getType() == OpType::AodActivate ||
+      op->getType() == OpType::AodDeactivate ||
+      op->getType() == OpType::AodMove) {
+    return getShuttlingAverageFidelity(op->getType());
+  }
+  return getGateAverageFidelity(op->getType());
+}
+
+std::set<CoordIndex>
+NeutralAtomArchitecture::getBlockedCoordIndices(const Operation* op) const {
+  if (op->getNqubits() == 1 || op->getType() == OpType::AodActivate ||
+      op->getType() == OpType::AodDeactivate ||
+      op->getType() == OpType::AodMove) {
+    return op->getUsedQubits();
+  }
+  std::set<CoordIndex> blockedCoordIndices;
+  for (const auto& coord : op->getUsedQubits()) {
+    for (uint32_t i = 0; i < getNqubits(); ++i) {
+      if (i == coord) {
+        continue;
+      }
+      // do a preselection
+      // now check exact difference
+      auto const distance = getEuclidianDistance(coord, i);
+      if (distance <= getBlockingFactor() * getInteractionRadius()) {
+        blockedCoordIndices.insert(i);
+      }
+    }
+  }
+  return blockedCoordIndices;
+}
 } // namespace qc

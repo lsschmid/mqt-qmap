@@ -141,6 +141,11 @@ public:
     return properties.getNAodIntermediateLevels();
   }
 
+  [[nodiscard]] fp getOpTime(const Operation* op) const;
+  [[nodiscard]] fp getOpFidelity(const Operation* op) const;
+  [[nodiscard]] std::set<CoordIndex>
+  getBlockedCoordIndices(const Operation* op) const;
+
   [[nodiscard]] inline fp getGateTime(OpType opType) const {
     if (parameters.gateTimes.find(opType) == parameters.gateTimes.end()) {
       return parameters.gateTimes.at(OpType::None);
