@@ -327,7 +327,12 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
   for (const auto& opInit : opsInit) {
     if (opInit.getType() == OpType::AodMove) {
       for (const auto& opFinal : opsFinal) {
-        if (opInit.getType() == OpType::AodMove) {
+        if (opFinal.getType() == OpType::AodMove) {
+          if (opInit.getTargets().size() <= 1 ||
+              opFinal.getTargets().size() <= 1) {
+            throw QFRException("AodScheduler::MoveGroup::connectAodOperations: "
+                               "AodMove operation with less than 2 targets");
+          }
           if (opInit.getTargets()[0] == opFinal.getTargets()[0] &&
               opInit.getTargets()[1] == opFinal.getTargets()[1]) {
             targetQubits.push_back(opInit.getTargets()[0]);
@@ -493,7 +498,7 @@ AodScheduler::AodActivationHelper::getAodOperations() const {
   std::vector<AodOperation> aodOperations;
   for (const auto& activation : allActivations) {
     auto operations = getAodOperation(activation, arch, type);
-    aodOperations.push_back(std::move(operations.first));
+    aodOperations.emplace_back(std::move(operations.first));
     aodOperations.emplace_back(std::move(operations.second));
   }
   return aodOperations;
