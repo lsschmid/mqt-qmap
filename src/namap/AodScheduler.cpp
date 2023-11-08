@@ -322,7 +322,7 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
   // and connect with an aod move operations
   // all can be done in parallel in a single move
   std::vector<SingleOperation> aodOperations;
-  std::vector<CoordIndex>      targetQubits;
+  std::set<CoordIndex>         targetQubits;
 
   for (const auto& opInit : opsInit) {
     if (opInit.getType() == OpType::AodMove) {
@@ -333,10 +333,9 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
             throw QFRException("AodScheduler::MoveGroup::connectAodOperations: "
                                "AodMove operation with less than 2 targets");
           }
-          if (opInit.getTargets()[0] == opFinal.getTargets()[0] &&
-              opInit.getTargets()[1] == opFinal.getTargets()[1]) {
-            targetQubits.push_back(opInit.getTargets()[0]);
-            targetQubits.push_back(opInit.getTargets()[1]);
+          if (opInit.getTargets() == opFinal.getTargets()) {
+            targetQubits.insert(opInit.getTargets().begin(),
+                                opInit.getTargets().end());
             // found corresponding final operation
             // connect with aod move
             const auto startXs = opInit.getEnds(Dimension::X);
@@ -362,7 +361,12 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
       }
     }
   }
-  return {OpType::AodMove, targetQubits, aodOperations};
+  std::vector<CoordIndex> targetQubitsVec;
+  targetQubitsVec.reserve(targetQubits.size());
+  for (const auto& qubit : targetQubits) {
+    targetQubitsVec.push_back(qubit);
+  }
+  return {OpType::AodMove, targetQubitsVec, aodOperations};
 }
 
 std::vector<AodScheduler::AodActivationHelper::AodMove*>
