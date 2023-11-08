@@ -60,11 +60,11 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       printTotalExecutionTimes(totalExecutionTimes);
     }
   }
-  if (verbose) {
-    printSchedulerResults(totalExecutionTimes, totalIdleTime,
-                          totalGateFidelities);
-    std::cout << "\n* schedule end!\n";
-  }
+  //  if (verbose) {
+  printSchedulerResults(totalExecutionTimes, totalIdleTime,
+                        totalGateFidelities);
+  std::cout << "\n* schedule end!\n";
+  //}
 
   auto maxExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
