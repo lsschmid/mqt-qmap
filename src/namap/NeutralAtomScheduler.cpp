@@ -60,10 +60,10 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       printTotalExecutionTimes(totalExecutionTimes);
     }
   }
-  if (verbose) {
+  //if (verbose) {
     printSchedulerResults(totalExecutionTimes, totalIdleTime, totalFidelities);
     std::cout << "\n* schedule end!\n";
-  }
+  //}
 
   return {totalExecutionTimes, totalIdleTime, totalFidelities};
 }
