@@ -60,9 +60,9 @@ public:
         [qubit](const auto& pair) { return pair.second == qubit; });
   }
 
-  inline void mapToHwQubits(std::unique_ptr<Operation>* op) const {
-    (*op)->setTargets(circToHw.apply((*op)->getTargets()));
-    (*op)->setControls(circToHw.apply((*op)->getControls()));
+  inline void mapToHwQubits(Operation* op) const {
+    op->setTargets(circToHw.apply(op->getTargets()));
+    op->setControls(circToHw.apply(op->getControls()));
   }
 
   void swap(Swap swap);

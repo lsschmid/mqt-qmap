@@ -14,7 +14,7 @@
 
 namespace qc {
 
-using GateList = std::set<std::unique_ptr<qc::Operation>*>;
+using GateList = std::set<const Operation*>;
 
 struct MapperParameters {
   fp lookaheadWeightSwaps          = 0.1;
@@ -30,31 +30,31 @@ struct MapperParameters {
 
 class NeutralAtomMapper {
 protected:
-  qc::NeutralAtomArchitecture                  arch;
-  qc::QuantumComputation                       mappedQc;
-  std::vector<std::unique_ptr<qc::Operation>*> executedCommutingGates;
-  GateList                                     frontLayerGate;
-  GateList                                     frontLayerShuttling;
-  std::set<Qubit>                              frontQubitsToUpdate;
-  std::vector<GateList>                        frontCandidates;
-  DAG                                          dag;
-  DAGIterators                                 frontLayerIterators;
-  std::vector<SwapOrMove>                      swapCloseByFront;
-  std::vector<std::pair<SwapOrMove, fp>>       moveExactFront;
-  GateList                                     lookaheadLayerGate;
-  GateList                                     lookaheadLayerShuttling;
-  std::vector<uint32_t>                        lookaheadOffsets;
-  std::vector<GateList>                        lookaheadCandidates;
-  std::set<Qubit>                              lookaheadQubitsToUpdate;
-  uint32_t                                     lookaheadDepth = 1;
-  std::vector<SwapOrMove>                      swapCloseByLookahead;
-  std::vector<std::pair<SwapOrMove, fp>>       moveExactLookahead;
-  MapperParameters                             parameters;
-  std::deque<std::set<HwQubit>>                lastBlockedQubits;
-  std::deque<AtomMove>                         lastMoves;
-  std::vector<fp>                              decayWeights;
-  uint32_t                                     nSwaps = 0;
-  uint32_t                                     nMoves = 0;
+  qc::NeutralAtomArchitecture            arch;
+  qc::QuantumComputation                 mappedQc;
+  std::vector<const Operation*>          executedCommutingGates;
+  GateList                               frontLayerGate;
+  GateList                               frontLayerShuttling;
+  std::set<Qubit>                        frontQubitsToUpdate;
+  std::vector<GateList>                  frontCandidates;
+  DAG                                    dag;
+  DAGIterators                           frontLayerIterators;
+  std::vector<SwapOrMove>                swapCloseByFront;
+  std::vector<std::pair<SwapOrMove, fp>> moveExactFront;
+  GateList                               lookaheadLayerGate;
+  GateList                               lookaheadLayerShuttling;
+  std::vector<uint32_t>                  lookaheadOffsets;
+  std::vector<GateList>                  lookaheadCandidates;
+  std::set<Qubit>                        lookaheadQubitsToUpdate;
+  uint32_t                               lookaheadDepth = 1;
+  std::vector<SwapOrMove>                swapCloseByLookahead;
+  std::vector<std::pair<SwapOrMove, fp>> moveExactLookahead;
+  MapperParameters                       parameters;
+  std::deque<std::set<HwQubit>>          lastBlockedQubits;
+  std::deque<AtomMove>                   lastMoves;
+  std::vector<fp>                        decayWeights;
+  uint32_t                               nSwaps = 0;
+  uint32_t                               nMoves = 0;
 
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;
@@ -63,32 +63,27 @@ protected:
 
   // Methods for layer creation
   void createFrontLayer();
-  void
-  updateFrontLayerByGate(std::set<std::unique_ptr<Operation>*>& gatesToExecute);
+  void updateFrontLayerByGate(std::set<const Operation*>& gatesToExecute);
   void updateFrontLayerByQubit();
   void updateFrontLayerByCandidates();
   void findFrontCandidates();
   void updateLookaheadLayerByQubit();
   void findLookaheadCandidates();
   void updateLookaheadLayerByCandidates();
-  void mapGate(std::unique_ptr<qc::Operation>* op);
-  static bool
-              commutesWithAtQubit(const GateList&                       layer,
-                                  const std::unique_ptr<qc::Operation>* opPointer,
-                                  const Qubit&                          qubit);
-  static bool commuteAtQubit(const std::unique_ptr<qc::Operation>* opPointer1,
-                             const std::unique_ptr<qc::Operation>* opPointer2,
-                             const Qubit&                          qubit);
-  bool        isExecutable(std::unique_ptr<qc::Operation>* opPointer);
-  void        addToFrontLayer(std::unique_ptr<qc::Operation>* opPointer);
-  void        addToLookaheadLayer(std::unique_ptr<qc::Operation>* opPointer);
+  void mapGate(const Operation* op);
+  static bool commutesWithAtQubit(const GateList&  layer,
+                                  const Operation* opPointer,
+                                  const Qubit&     qubit);
+  static bool commuteAtQubit(const Operation* opPointer1,
+                             const Operation* opPointer2, const Qubit& qubit);
+  bool        isExecutable(const Operation* opPointer);
+  void        addToFrontLayer(const Operation* opPointer);
+  void        addToLookaheadLayer(const Operation* opPointer);
 
   // Methods for estimation
-  std::pair<uint32_t, fp>
-  estimateNumSwapGates(const std::unique_ptr<qc::Operation>* opPointer);
-  std::pair<uint32_t, fp>
-       estimateNumMove(const std::unique_ptr<qc::Operation>* opPointer);
-  bool swapGateBetter(const std::unique_ptr<qc::Operation>* opPointer);
+  std::pair<uint32_t, fp> estimateNumSwapGates(const Operation* opPointer);
+  std::pair<uint32_t, fp> estimateNumMove(const Operation* opPointer);
+  bool                    swapGateBetter(const Operation* opPointer);
 
   // Methods for mapping
   Swap           findBestSwap();
@@ -115,14 +110,14 @@ protected:
   fp       moveCostComb(const MoveComb& moveComb);
   fp       moveDistancePerLayer(const AtomMove& move, GateList& layer);
   fp       parallelMoveCost(const AtomMove& move);
-  HwQubits getBestMultiQubitPosition(std::unique_ptr<qc::Operation>* opPointer);
+  HwQubits getBestMultiQubitPosition(const Operation* opPointer);
   HwQubits getBestMultiQubitPositionRec(const HwQubits& gateQubits,
                                         HwQubits        selectedQubits,
                                         HwQubits        remainingQubits);
   std::vector<std::set<CoordIndex>>
   getClosestFreePosition(const HwQubits& gateQubits);
   std::vector<std::pair<SwapOrMove, fp>>
-  getExactMoveToPosition(std::unique_ptr<Operation>* op, HwQubits position);
+  getExactMoveToPosition(const Operation* op, HwQubits position);
   MoveCombs
   getMoveCombinationsToPosition(HwQubits&                          gateQubits,
                                 std::vector<std::set<CoordIndex>>& positions);

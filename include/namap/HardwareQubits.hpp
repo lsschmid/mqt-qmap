@@ -102,9 +102,9 @@ public:
     return this->arch.getNearbyCoordinates(this->getCoordIndex(q));
   }
 
-  inline void mapToCoordIdx(std::unique_ptr<Operation>* op) const {
-    (*op)->setTargets(hwToCoordIdx.apply((*op)->getTargets()));
-    (*op)->setControls(hwToCoordIdx.apply((*op)->getControls()));
+  inline void mapToCoordIdx(Operation* op) const {
+    op->setTargets(hwToCoordIdx.apply(op->getTargets()));
+    op->setControls(hwToCoordIdx.apply(op->getControls()));
   }
 
   void move(HwQubit hwQubit, CoordIndex newCoord);
