@@ -21,11 +21,12 @@ QuantumComputation AodScheduler::schedule(QuantumComputation& qc) {
     if (groupIt != moveGroups.end() && idx == groupIt->getFirstIdx()) {
       // add move group
       for (auto& aodOp : groupIt->processedOpsInit) {
-        qcScheduled.emplace_back(aodOp->clone());
+        qcScheduled.emplace_back(std::make_unique<AodOperation>(aodOp));
       }
-      qcScheduled.emplace_back(groupIt->processedOpShuttle->clone());
+      qcScheduled.emplace_back(
+          std::make_unique<AodOperation>(groupIt->processedOpShuttle));
       for (auto& aodOp : groupIt->processedOpsFinal) {
-        qcScheduled.emplace_back(aodOp->clone());
+        qcScheduled.emplace_back(std::make_unique<AodOperation>(aodOp));
       }
       groupIt++;
     } else if (op->getType() != OpType::Move) {
@@ -212,14 +213,13 @@ AodScheduler::AodActivationHelper::canAddActivation(
   auto aodMovesX = getAodMoves(Dimension::X, origin.getX());
   auto aodMovesY = getAodMoves(Dimension::Y, origin.getY());
 
-  auto const canX = canMergeActivation(Dimension::X, origin, move, v);
-  auto const canY = canMergeActivation(Dimension::Y, origin, move, v);
+  auto const canX = canMergeActivation(Dimension::X, origin, v);
+  auto const canY = canMergeActivation(Dimension::Y, origin, v);
   return std::make_pair(canX, canY);
 }
 
 ActivationMerge AodScheduler::AodActivationHelper::canMergeActivation(
-    Dimension dim, const Coordinate& origin, const AtomMove& move,
-    MoveVector v) const {
+    Dimension dim, const Coordinate& origin, MoveVector v) const {
   auto x = dim == Dimension::X ? origin.getX() : origin.getY();
   auto sign =
       dim == Dimension::X ? v.direction.getSignX() : v.direction.getSignY();
@@ -315,9 +315,9 @@ void AodScheduler::processMoveGroups() {
   }
 }
 
-OpPointer AodScheduler::MoveGroup::connectAodOperations(
-    const std::vector<OpPointer>& opsInit,
-    const std::vector<OpPointer>& opsFinal) {
+AodOperation AodScheduler::MoveGroup::connectAodOperations(
+    const std::vector<AodOperation>& opsInit,
+    const std::vector<AodOperation>& opsFinal) {
   // for each init operation find the corresponding final operation
   // and connect with an aod move operations
   // all can be done in parallel in a single move
@@ -325,17 +325,19 @@ OpPointer AodScheduler::MoveGroup::connectAodOperations(
   std::vector<CoordIndex>      targetQubits;
 
   for (const auto& opInit : opsInit) {
-    if (opInit->getType() == OpType::AodMove) {
+    if (opInit.getType() == OpType::AodMove) {
       for (const auto& opFinal : opsFinal) {
-        if (opInit->getType() == OpType::AodMove) {
-          if (opInit->getTargets()[0] == opFinal->getTargets()[0] &&
-              opInit->getTargets()[1] == opFinal->getTargets()[1]) {
-            targetQubits.push_back(opInit->getTargets()[0]);
-            targetQubits.push_back(opInit->getTargets()[1]);
+        if (opInit.getType() == OpType::AodMove) {
+          if (opInit.getTargets()[0] == opFinal.getTargets()[0] &&
+              opInit.getTargets()[1] == opFinal.getTargets()[1]) {
+            targetQubits.push_back(opInit.getTargets()[0]);
+            targetQubits.push_back(opInit.getTargets()[1]);
             // found corresponding final operation
             // connect with aod move
-            const auto startXs = opInit->getEnds(Dimension::X);
-            const auto endXs   = opFinal->getEnds(Dimension::X);
+            const auto startXs = opInit.getEnds(Dimension::X);
+            const auto endXs   = opFinal.getEnds(Dimension::X);
+            const auto startYs = opInit.getEnds(Dimension::Y);
+            const auto endYs   = opFinal.getEnds(Dimension::Y);
             if (!startXs.empty() && !endXs.empty()) {
               const auto startX = startXs[0];
               const auto endX   = endXs[0];
@@ -343,8 +345,6 @@ OpPointer AodScheduler::MoveGroup::connectAodOperations(
                 aodOperations.emplace_back(Dimension::X, startX, endX);
               }
             }
-            const auto startYs = opInit->getEnds(Dimension::Y);
-            const auto endYs   = opFinal->getEnds(Dimension::Y);
             if (!startYs.empty() && !endYs.empty()) {
               const auto startY = startYs[0];
               const auto endY   = endYs[0];
@@ -357,8 +357,7 @@ OpPointer AodScheduler::MoveGroup::connectAodOperations(
       }
     }
   }
-  return std::make_unique<AodOperation>(OpType::AodMove, targetQubits,
-                                        aodOperations);
+  return {OpType::AodMove, targetQubits, aodOperations};
 }
 
 std::vector<AodScheduler::AodActivationHelper::AodMove*>
@@ -434,7 +433,7 @@ void AodScheduler::AodActivationHelper::mergeActivation(
   }
 }
 
-std::pair<OpPointer, OpPointer>
+std::pair<AodOperation, AodOperation>
 AodScheduler::AodActivationHelper::getAodOperation(
     const AodActivationHelper::AodActivation& activation,
     const NeutralAtomArchitecture& arch, OpType type) {
@@ -481,19 +480,17 @@ AodScheduler::AodActivationHelper::getAodOperation(
             static_cast<fp>(aodMove->offset) * interD);
   }
 
-  auto initOp =
-      std::make_unique<AodOperation>(type, qubitsActivation, initOperations);
-  auto offsetOp = std::make_unique<AodOperation>(OpType::AodMove, qubitsMove,
-                                                 offsetOperations);
+  auto initOp   = AodOperation(type, qubitsActivation, initOperations);
+  auto offsetOp = AodOperation(OpType::AodMove, qubitsMove, offsetOperations);
   if (type == OpType::AodActivate) {
-    return std::make_pair(std::move(initOp), std::move(offsetOp));
+    return std::make_pair(initOp, offsetOp);
   }
-  return std::make_pair(std::move(offsetOp), std::move(initOp));
+  return std::make_pair(initOp, offsetOp);
 }
 
-std::vector<OpPointer>
+std::vector<AodOperation>
 AodScheduler::AodActivationHelper::getAodOperations() const {
-  std::vector<OpPointer> aodOperations;
+  std::vector<AodOperation> aodOperations;
   for (const auto& activation : allActivations) {
     auto operations = getAodOperation(activation, arch, type);
     aodOperations.push_back(std::move(operations.first));

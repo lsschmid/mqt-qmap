@@ -63,8 +63,7 @@ protected:
     canAddActivation(const Coordinate& origin, const AtomMove& move,
                      MoveVector v) const;
     ActivationMerge canMergeActivation(Dimension dim, const Coordinate& origin,
-                                       const AtomMove& move,
-                                       MoveVector      v) const;
+                                       MoveVector v) const;
     void        addActivation(std::pair<ActivationMerge, ActivationMerge> merge,
                               const Coordinate& origin, const AtomMove& move,
                               MoveVector v);
@@ -77,10 +76,10 @@ protected:
     [[nodiscard]] bool checkIntermediateSpace(Dimension dim, uint32_t x,
                                               int32_t sign) const;
 
-    [[nodiscard]] static std::pair<OpPointer, OpPointer>
+    [[nodiscard]] static std::pair<AodOperation, AodOperation>
     getAodOperation(const AodActivation&           activation,
                     const NeutralAtomArchitecture& arch, OpType type);
-    [[nodiscard]] std::vector<OpPointer> getAodOperations() const;
+    [[nodiscard]] std::vector<AodOperation> getAodOperations() const;
 
     AodActivationHelper(NeutralAtomArchitecture arch, OpType type)
         : arch(std::move(arch)), type(type) {}
@@ -89,9 +88,9 @@ protected:
   struct MoveGroup {
     NeutralAtomArchitecture                    arch;
     std::vector<std::pair<AtomMove, uint32_t>> moves;
-    std::vector<OpPointer>                     processedOpsInit;
-    std::vector<OpPointer>                     processedOpsFinal;
-    OpPointer                                  processedOpShuttle;
+    std::vector<AodOperation>                  processedOpsInit;
+    std::vector<AodOperation>                  processedOpsFinal;
+    AodOperation                               processedOpShuttle;
     std::vector<CoordIndex>                    targetQubits;
     std::vector<CoordIndex>                    qubitsUsedByGates;
 
@@ -103,9 +102,9 @@ protected:
     [[nodiscard]] inline bool isFirstOpSet() const { return !moves.empty(); }
     static bool parallelCheck(const MoveVector& v1, const MoveVector& v2);
 
-    static OpPointer
-    connectAodOperations(const std::vector<OpPointer>& opsInit,
-                         const std::vector<OpPointer>& opsFinal);
+    static AodOperation
+    connectAodOperations(const std::vector<AodOperation>& opsInit,
+                         const std::vector<AodOperation>& opsFinal);
 
     MoveGroup(NeutralAtomArchitecture arch) : arch(std::move(arch)) {}
   };
