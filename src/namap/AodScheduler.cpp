@@ -264,12 +264,11 @@ void AodScheduler::processMoveGroups() {
   // convert the moves from MoveGroup to AodOperations
   for (auto groupIt = moveGroups.begin(); groupIt != moveGroups.end();
        ++groupIt) {
-    auto&                 moveGroup = *groupIt;
     AodActivationHelper   aodActivationHelper{arch, OpType::AodActivate};
     AodActivationHelper   aodDeactivationHelper{arch, OpType::AodDeactivate};
     MoveGroup             possibleNewMoveGroup{arch};
     std::vector<AtomMove> movesToRemove;
-    for (auto& movePair : moveGroup.moves) {
+    for (auto& movePair : groupIt->moves) {
       auto& move     = movePair.first;
       auto  idx      = movePair.second;
       auto  origin   = arch.getCoordinate(move.first);
@@ -295,16 +294,17 @@ void AodScheduler::processMoveGroups() {
       }
       // remove from current move group
       for (const auto& moveToRemove : movesToRemove) {
-        moveGroup.moves.erase(
-            std::remove_if(moveGroup.moves.begin(), moveGroup.moves.end(),
+        groupIt->moves.erase(
+            std::remove_if(groupIt->moves.begin(), groupIt->moves.end(),
                            [&moveToRemove](const auto& movePair) {
                              return movePair.first == moveToRemove;
                            }),
-            moveGroup.moves.end());
+            groupIt->moves.end());
       }
       if (!possibleNewMoveGroup.moves.empty()) {
         groupIt =
             moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
+        possibleNewMoveGroup = MoveGroup{arch};
         groupIt--;
       }
     }
