@@ -1103,6 +1103,7 @@ MoveCombs NeutralAtomMapper::getAllPossibleMoveCombinations() {
       std::vector<HwQubits> nearbyPositions;
       for (const auto& qubit : usedHwQubits) {
         auto nearbyQubits = this->hardwareQubits.getNearbyQubits(qubit);
+        nearbyQubits.insert(qubit);
         nearbyPositions.push_back(nearbyQubits);
       }
       auto multiQubitMoves =
@@ -1151,7 +1152,7 @@ NeutralAtomMapper::getClosestFreePosition(const qc::Qubits& qubits) {
     auto nearbyFreeCoords =
         this->hardwareQubits.getNearbyFreeCoordinatesByCoord(coord);
     if (nearbyFreeCoords.size() < numFreePos) {
-      for (const auto& freeCoord : nearbyFreeCoords) {
+      for (const auto& freeCoord : arch.getNearbyCoordinates(coord)) {
         if (std::find(visited.begin(), visited.end(), freeCoord) ==
             visited.end()) {
           q.push(freeCoord);
@@ -1171,34 +1172,34 @@ MoveCombs NeutralAtomMapper::getMoveCombinationsToPosition(
   if (positions.empty()) {
     return {};
   }
-  MoveCombs               moveCombinations;
-  std::vector<CoordIndex> gateQubitCoords;
+  MoveCombs            moveCombinations;
+  std::set<CoordIndex> gateQubitCoords;
   for (const auto& gateQubit : gateQubits) {
-    gateQubitCoords.push_back(this->hardwareQubits.getCoordIndex(gateQubit));
+    gateQubitCoords.insert(this->hardwareQubits.getCoordIndex(gateQubit));
   }
 
-  for (const auto& position : positions) {
+  for (auto remainingCoords : positions) {
+    MoveComb moveComb;
     // compute cost for each candidate and each gateQubit
-    for (const auto& candidate : position) {
-      if (std::find(gateQubitCoords.begin(), gateQubitCoords.end(),
-                    candidate) != gateQubitCoords.end()) {
-        continue;
+    auto remainingGateCoords = gateQubitCoords;
+    while (!remainingGateCoords.empty()) {
+      auto currentGateQubit = *remainingGateCoords.begin();
+      std::vector<std::pair<CoordIndex, fp>> costs;
+      for (const auto& remainingCoord : remainingCoords) {
+        auto cost = moveCost({currentGateQubit, remainingCoord});
+        costs.emplace_back(remainingCoord, cost);
       }
-      for (const auto& gateQubitCoord : gateQubitCoords) {
-        if (gateQubitCoord == candidate ||
-            position.find(gateQubitCoord) != position.end()) {
-          continue;
-        }
-        if (this->hardwareQubits.isMapped(candidate)) {
-          // add move away move
-          auto moveAway = getMoveAwayCombinations(gateQubitCoord, candidate);
-          moveCombinations.addMoveCombs(moveAway);
-        } else { // candidate coord is free
-          auto move = AtomMove{gateQubitCoord, candidate};
-          moveCombinations.addMoveComb(MoveComb({move}));
-        }
-      }
+      // find minimal cost
+      auto bestCost = std::min_element(
+          costs.begin(), costs.end(), [](const auto& cost1, const auto& cost2) {
+            return cost1.second < cost2.second;
+          });
+      auto bestCoord = bestCost->first;
+      moveComb.append(AtomMove{currentGateQubit, bestCoord});
+      remainingGateCoords.erase(currentGateQubit);
+      remainingCoords.erase(bestCoord);
     }
+    moveCombinations.addMoveComb(moveComb);
   }
 
   return moveCombinations;

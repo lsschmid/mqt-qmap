@@ -101,6 +101,7 @@ struct MoveComb {
   MoveComb(AtomMove move, fp cost)
       : moves(std::vector<AtomMove>{std::move(move)}), cost(cost) {}
 
+  MoveComb() = default;
   MoveComb(std::vector<AtomMove> moves) : moves(std::move(moves)) {}
   MoveComb(AtomMove move) : moves(std::vector<AtomMove>{std::move(move)}) {}
 
@@ -116,6 +117,11 @@ struct MoveComb {
 
   inline void append(AtomMove& addMove) {
     moves.push_back(addMove);
+    cost = std::numeric_limits<fp>::quiet_NaN();
+  }
+  inline void append(const MoveComb& addMoveComb) {
+    moves.insert(moves.end(), addMoveComb.moves.begin(),
+                 addMoveComb.moves.end());
     cost = std::numeric_limits<fp>::quiet_NaN();
   }
   [[nodiscard]] inline size_t size() const { return moves.size(); }
