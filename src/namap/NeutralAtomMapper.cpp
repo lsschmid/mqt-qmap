@@ -1096,37 +1096,97 @@ MoveCombs NeutralAtomMapper::getAllPossibleMoveCombinations() {
         moves.addMoveCombs(moves1);
         moves.addMoveCombs(moves2);
       }
+      auto freePos      = getClosestFreePosition(usedQubits);
+      auto freePosMoves = getMoveCombinationsToPosition(usedHwQubits, freePos);
+      moves.addMoveCombs(freePosMoves);
     } else {
-      auto multiQubitMoves = getMoveCombinationsToPosition(usedHwQubits);
+      std::vector<HwQubits> nearbyPositions;
+      for (const auto& qubit : usedHwQubits) {
+        auto nearbyQubits = this->hardwareQubits.getNearbyQubits(qubit);
+        nearbyPositions.push_back(nearbyQubits);
+      }
+      auto multiQubitMoves =
+          getMoveCombinationsToPosition(usedHwQubits, nearbyPositions);
       moves.addMoveCombs(multiQubitMoves);
+      auto freePos      = getClosestFreePosition(usedQubits);
+      auto freePosMoves = getMoveCombinationsToPosition(usedHwQubits, freePos);
+      moves.addMoveCombs(freePosMoves);
     }
   }
   return moves;
 }
 
-MoveCombs
-NeutralAtomMapper::getMoveCombinationsToPosition(qc::HwQubits& gateQubits) {
+std::vector<std::set<CoordIndex>>
+NeutralAtomMapper::getClosestFreePosition(const qc::Qubits& qubits) {
+  // returns a set of coordinates that are free and minimal
+  // distance to all other qubits
+  auto numFreePos = qubits.size();
+
+  // priority queue ordered by distance of the CoordIndex to
+  // all qubits summed up
+  std::priority_queue<CoordIndex, std::vector<CoordIndex>,
+                      std::function<bool(const CoordIndex&, const CoordIndex&)>>
+      q([this, &qubits](const CoordIndex& coord1, const CoordIndex& coord2) {
+        fp dist1 = 0;
+        fp dist2 = 0;
+        for (const auto& qubit : qubits) {
+          auto hwQubit = this->mapping.getHwQubit(qubit);
+          dist1 += this->arch.getEuclidianDistance(coord1, hwQubit);
+          dist2 += this->arch.getEuclidianDistance(coord2, hwQubit);
+        }
+        return dist1 > dist2;
+      });
+
+  for (const auto& qubit : qubits) {
+    auto coord = this->hardwareQubits.getCoordIndex(qubit);
+    q.push(coord);
+  }
+
+  std::vector<CoordIndex> visited;
+  while (!q.empty()) {
+    auto coord = q.top();
+    q.pop();
+    visited.push_back(coord);
+
+    auto nearbyFreeCoords =
+        this->hardwareQubits.getNearbyFreeCoordinatesByCoord(coord);
+    if (nearbyFreeCoords.size() < numFreePos) {
+      for (const auto& freeCoord : nearbyFreeCoords) {
+        if (std::find(visited.begin(), visited.end(), freeCoord) ==
+            visited.end()) {
+          q.push(freeCoord);
+        }
+      }
+    } else {
+      return {nearbyFreeCoords};
+    }
+  }
+  return {};
+}
+
+MoveCombs NeutralAtomMapper::getMoveCombinationsToPosition(
+    qc::HwQubits& gateQubits, std::vector<std::set<CoordIndex>>& positions) {
   // compute for each qubit the best position around it based on the cost of the
   // single move choose best one
-  MoveCombs moveCombinations;
-  std::vector<std::tuple<CoordIndex, fp, std::set<MoveComb>>>
-                          movesPerQubitPosition;
+  if (positions.empty()) {
+    return {};
+  }
+  MoveCombs               moveCombinations;
   std::vector<CoordIndex> gateQubitCoords;
   for (const auto& gateQubit : gateQubits) {
     gateQubitCoords.push_back(this->hardwareQubits.getCoordIndex(gateQubit));
   }
 
-  for (const auto& gateQubit : gateQubits) {
-    auto posCandidates = this->hardwareQubits.getNearbyCoordinates(gateQubit);
+  for (const auto& position : positions) {
     // compute cost for each candidate and each gateQubit
-    for (const auto& candidate : posCandidates) {
+    for (const auto& candidate : position) {
       if (std::find(gateQubitCoords.begin(), gateQubitCoords.end(),
                     candidate) != gateQubitCoords.end()) {
         continue;
       }
       for (const auto& gateQubitCoord : gateQubitCoords) {
-        if (gateQubitCoord == this->hardwareQubits.getCoordIndex(gateQubit) ||
-            posCandidates.find(gateQubitCoord) != posCandidates.end()) {
+        if (gateQubitCoord == candidate ||
+            position.find(gateQubitCoord) != position.end()) {
           continue;
         }
         if (this->hardwareQubits.isMapped(candidate)) {

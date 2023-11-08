@@ -118,9 +118,13 @@ protected:
   HwQubits getBestMultiQubitPositionRec(const HwQubits& gateQubits,
                                         HwQubits        selectedQubits,
                                         HwQubits        remainingQubits);
+  std::vector<std::set<CoordIndex>>
+  getClosestFreePosition(const HwQubits& gateQubits);
   std::vector<std::pair<SwapOrMove, fp>>
   getExactMoveToPosition(std::unique_ptr<Operation>* op, HwQubits position);
-  MoveCombs getMoveCombinationsToPosition(HwQubits& gateQubits);
+  MoveCombs
+  getMoveCombinationsToPosition(HwQubits&                          gateQubits,
+                                std::vector<std::set<CoordIndex>>& positions);
   // temp
   void printLayers();
 
