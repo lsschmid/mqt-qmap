@@ -7,13 +7,13 @@
 #include "namap/NeutralAtomScheduler.hpp"
 
 int main(int argc, char* argv[]) {
-  if (argc != 16) {
+  if (argc != 17) {
     std::cerr << "Usage: " << argv[0]
               << " <runIdx> <input_directory> <output_directory> "
                  "<lookaheadGate> <lookaheadShuttling> <gateDecay> "
                  "<shuttlingTimeWeight> <shuttlingMakeExecutableBonus> "
                  "<shuttlingMulitQubitWeight> <gateMulitQubitWeight> "
-                 "<gateOrShuttlingWeight> <verbose> <json_config_file_path> "
+                 "<gateWeight> <gateWeight> <verbose> <json_config_file_path> "
                  "<initialCoordinateMapping> <initialCircuitMapping>\n";
     return 1;
   }
@@ -28,11 +28,12 @@ int main(int argc, char* argv[]) {
   double      shuttlingMakeExecutableBonus = std::stod(argv[8]);
   double      shuttlingMulitQubitWeight    = std::stod(argv[9]);
   double      gateMulitQubitWeight         = std::stod(argv[10]);
-  double      gateOrShuttlingWeight        = std::stod(argv[11]);
-  bool        verbose                      = std::atoi(argv[12]) != 0;
-  std::string json_config_file_path        = argv[13];
-  std::string initialCoordinateMapping     = argv[14];
-  std::string initialCircuitMapping        = argv[15];
+  double      gateWeight                   = std::stod(argv[11]);
+  double      shuttlingWeight              = std::stod(argv[12]);
+  bool        verbose                      = std::atoi(argv[13]) != 0;
+  std::string json_config_file_path        = argv[14];
+  std::string initialCoordinateMapping     = argv[15];
+  std::string initialCircuitMapping        = argv[16];
 
   // Check if the output directory exists and create it if it doesn't.
   if (!std::filesystem::exists(output_directory)) {
@@ -91,7 +92,8 @@ int main(int argc, char* argv[]) {
         shuttlingMakeExecutableBonus;
     mapperParameters.multiQubitGateWeight          = shuttlingMulitQubitWeight;
     mapperParameters.multiQubitGateWeightShuttling = gateMulitQubitWeight;
-    mapperParameters.gateShuttlingWeight           = gateOrShuttlingWeight;
+    mapperParameters.gateWeight                    = gateWeight;
+    mapperParameters.shuttlingWeight               = shuttlingWeight;
     mapper.setParameters(mapperParameters);
 
     std::cout << "Mapping " << qasmFile << "\n";
@@ -125,7 +127,8 @@ int main(int argc, char* argv[]) {
     ofs_params << "shuttlingMulitQubitWeight: " << shuttlingMulitQubitWeight
                << "\n";
     ofs_params << "gateMulitQubitWeight: " << gateMulitQubitWeight << "\n";
-    ofs_params << "gateOrShuttlingWeight: " << gateOrShuttlingWeight << "\n";
+    ofs_params << "gateWeight: " << gateWeight << "\n";
+    ofs_params << "shuttlingWeight: " << shuttlingWeight << "\n";
     ofs_params << "verbose: " << verbose << "\n";
     ofs_params << "json_config_file_path: " << json_config_file_path << "\n";
     ofs_params << "initialCoordinateMapping: " << initialCoordinateMapping
