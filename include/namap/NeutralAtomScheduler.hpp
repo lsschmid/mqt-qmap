@@ -9,31 +9,27 @@
 
 namespace qc {
 struct SchedulerResults {
-  std::vector<fp> totalExecutionTimes;
-  fp              totalIdleTime;
-  fp              totalFidelities;
+  fp totalExecutionTime;
+  fp totalIdleTime;
+  fp totalGateFidelities;
+  fp totalFidelities;
 
-  SchedulerResults(std::vector<fp> totalExecutionTimes, fp totalIdleTime,
-                   fp totalFidelities)
-      : totalExecutionTimes(std::move(totalExecutionTimes)),
-        totalIdleTime(totalIdleTime), totalFidelities(totalFidelities) {}
+  SchedulerResults(fp totalExecutionTime, fp totalIdleTime,
+                   fp totalGateFidelities, fp totalFidelities)
+      : totalExecutionTime(totalExecutionTime), totalIdleTime(totalIdleTime),
+        totalGateFidelities(totalGateFidelities),
+        totalFidelities(totalFidelities) {}
 
   std::string inline toString() {
     std::stringstream ss;
-    ss << "Total execution times: ";
-    for (auto& time : totalExecutionTimes) {
-      ss << time << " ";
-    }
+    ss << "Total execution time: " << totalExecutionTime;
     ss << "\nTotal idle time: " << totalIdleTime
        << "\nTotal fidelities: " << totalFidelities;
     return ss.str();
   }
   std::string inline toCsv() {
     std::stringstream ss;
-    for (auto& time : totalExecutionTimes) {
-      ss << time << ",";
-    }
-    ss << totalIdleTime << "," << totalFidelities;
+    ss << totalExecutionTime << ", " << totalIdleTime << "," << totalFidelities;
     return ss.str();
   }
 };
@@ -43,12 +39,12 @@ protected:
   qc::NeutralAtomArchitecture arch;
   std::vector<fp>             totalExecutionTimes;
   fp                          totalIdleTime;
-  fp                          totalFidelities;
+  fp                          totalGateFidelities;
 
 public:
   NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch)
       : arch(arch), totalExecutionTimes(std::vector<fp>(arch.getNqubits(), 0)),
-        totalIdleTime(0), totalFidelities(1.0){};
+        totalIdleTime(0), totalGateFidelities(1.0){};
 
   SchedulerResults schedule(qc::QuantumComputation& qc, bool verbose);
 

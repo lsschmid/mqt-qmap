@@ -1335,13 +1335,16 @@ bool NeutralAtomMapper::swapGateBetter(
   auto [minNumSwaps, minTimeSwaps] = estimateNumSwapGates(opPointer);
   auto [minMoves, minTimeMoves]    = estimateNumMove(opPointer);
   auto fidSwaps =
-      std::exp(-minTimeSwaps / this->arch.getDecoherenceTime()) *
+      std::exp(-minTimeSwaps * this->arch.getNqubits() /
+               this->arch.getDecoherenceTime()) *
       std::pow(this->arch.getGateAverageFidelity(OpType::SWAP), minNumSwaps);
   auto fidMoves =
-      std::exp(-minTimeMoves / this->arch.getDecoherenceTime()) *
+      std::exp(-minTimeMoves * this->arch.getNqubits() /
+               this->arch.getDecoherenceTime()) *
       std::pow(this->arch.getGateAverageFidelity(OpType::Move), minMoves);
 
-  return fidSwaps * parameters.gateShuttlingWeight > fidMoves;
+  return fidSwaps * parameters.gateWeight >
+         fidMoves * parameters.shuttlingWeight;
 }
 
 } // namespace qc

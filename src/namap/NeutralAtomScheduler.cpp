@@ -43,7 +43,7 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       }
     }
 
-    // update totalExecutionTimes & totalIdleTime & totalFidelities
+    // update totalExecutionTimes & totalIdleTime & totalGateFidelities
     auto maxQubit = *std::max_element(
         blockedQubits.begin(), blockedQubits.end(), [this](size_t a, size_t b) {
           return totalExecutionTimes[a] < totalExecutionTimes[b];
@@ -54,18 +54,25 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       totalIdleTime += std::max(0.0, maxTime - totalExecutionTimes[qubit]);
       totalExecutionTimes[qubit] = maxTime + opTime;
     }
-    totalFidelities *= opFidelity;
+    totalGateFidelities *= opFidelity;
     if (verbose) {
       std::cout << "\n";
       printTotalExecutionTimes(totalExecutionTimes);
     }
   }
   if (verbose) {
-    printSchedulerResults(totalExecutionTimes, totalIdleTime, totalFidelities);
+    printSchedulerResults(totalExecutionTimes, totalIdleTime,
+                          totalGateFidelities);
     std::cout << "\n* schedule end!\n";
   }
 
-  return {totalExecutionTimes, totalIdleTime, totalFidelities};
+  auto maxExecutionTime =
+      *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
+  auto totalFidelities = totalGateFidelities *
+                         std::exp(-totalIdleTime / arch.getDecoherenceTime());
+
+  return {maxExecutionTime, totalIdleTime, totalGateFidelities,
+          totalFidelities};
 }
 
 void qc::NeutralAtomScheduler::printSchedulerResults(

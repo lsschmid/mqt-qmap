@@ -24,7 +24,8 @@ struct MapperParameters {
   fp shuttlingMakeExecutableBonus  = 1;
   fp multiQubitGateWeight          = 1;
   fp multiQubitGateWeightShuttling = 1;
-  fp gateShuttlingWeight           = 1;
+  fp gateWeight                    = 1;
+  fp shuttlingWeight               = 1;
 };
 
 class NeutralAtomMapper {
