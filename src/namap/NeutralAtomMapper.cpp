@@ -996,9 +996,6 @@ AtomMove NeutralAtomMapper::findBestAtomMove() {
 }
 
 fp NeutralAtomMapper::moveCostComb(const qc::MoveComb& moveComb) {
-  if (!std::isnan(moveComb.cost)) {
-    return moveComb.cost;
-  }
   fp costComb = 0;
   for (const auto& move : moveComb.moves) {
     costComb += moveCost(move);
