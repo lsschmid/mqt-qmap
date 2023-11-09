@@ -13,8 +13,13 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
     std::cout << "\n* schedule start!\n";
   }
 
+  std::vector<fp> totalExecutionTimes(arch.getNpositions(), 0);
+  std::vector<fp> blockedQubitsTimes(arch.getNpositions(), 0);
+  fp              totalGateTime       = 0;
+  fp              totalGateFidelities = 1;
+
   int index = 0;
-  for (auto& op : qc) {
+  for (const auto& op : qc) {
     index++;
     if (verbose) {
       std::cout << "\n" << index << "\n";
@@ -34,42 +39,58 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
                 << "\n";
     }
 
-    auto blockedQubits = arch.getBlockedCoordIndices(op.get());
-
-    if (verbose) {
-      std::cout << "blockedQubits: ";
+    fp maxTime = 0;
+    if (op->getType() != qc::AodMove && op->getType() != qc::AodActivate &&
+        op->getType() != qc::AodDeactivate && qubits.size() > 1) {
+      // multi qubit gates -> take into consideration blocking
+      auto blockedQubits = arch.getBlockedCoordIndices(op.get());
+      // get max execution time over all blocked qubits
       for (const auto& qubit : blockedQubits) {
-        std::cout << "q" << qubit << " ";
+        maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
+        maxTime = std::max(maxTime, blockedQubitsTimes[qubit]);
+      }
+
+      // update total execution times
+      for (const auto& qubit : qubits) {
+        totalExecutionTimes[qubit] = maxTime + opTime;
+      }
+      for (const auto& qubit : blockedQubits) {
+        blockedQubitsTimes[qubit] = maxTime + opTime;
+      }
+
+    } else {
+      // other operations -> no blocking
+      // get max execution time over all qubits
+      for (const auto& qubit : qubits) {
+        maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
+      }
+      // update total execution times
+      for (const auto& qubit : qubits) {
+        totalExecutionTimes[qubit] = maxTime + opTime;
       }
     }
 
-    // update totalExecutionTimes & totalIdleTime & totalGateFidelities
-    auto maxQubit = *std::max_element(
-        blockedQubits.begin(), blockedQubits.end(), [this](size_t a, size_t b) {
-          return totalExecutionTimes[a] < totalExecutionTimes[b];
-        });
-    fp const maxTime = totalExecutionTimes[maxQubit];
-
-    for (auto qubit : blockedQubits) {
-      totalIdleTime += std::max(0.0, maxTime - totalExecutionTimes[qubit]);
-      totalExecutionTimes[qubit] = maxTime + opTime;
-    }
     totalGateFidelities *= opFidelity;
+    totalGateTime += opTime;
     if (verbose) {
       std::cout << "\n";
-      printTotalExecutionTimes(totalExecutionTimes);
+      printTotalExecutionTimes(totalExecutionTimes, blockedQubitsTimes);
     }
   }
   //  if (verbose) {
-  printSchedulerResults(totalExecutionTimes, totalIdleTime,
-                        totalGateFidelities);
   std::cout << "\n* schedule end!\n";
   //}
 
-  auto maxExecutionTime =
+  const auto maxExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
-  auto totalFidelities = totalGateFidelities *
-                         std::exp(-totalIdleTime / arch.getDecoherenceTime());
+  const auto totalIdleTime =
+      maxExecutionTime * arch.getNpositions() - totalGateTime;
+  const auto totalFidelities =
+      totalGateFidelities *
+      std::exp(-totalIdleTime / arch.getDecoherenceTime());
+
+  printSchedulerResults(totalExecutionTimes, totalIdleTime, totalGateFidelities,
+                        totalFidelities);
 
   return {maxExecutionTime, totalIdleTime, totalGateFidelities,
           totalFidelities};
@@ -77,20 +98,21 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
 
 void qc::NeutralAtomScheduler::printSchedulerResults(
     std::vector<fp>& totalExecutionTimes, fp totalIdleTime,
-    fp totalFidelities) {
+    fp totalGateFidelities, fp totalFidelities) {
   auto totalExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
   std::cout << "\ntotalExecutionTimes: " << totalExecutionTime << "\n";
   std::cout << "totalIdleTime: " << totalIdleTime << "\n";
+  std::cout << "totalGateFidelities: " << totalGateFidelities << "\n";
   std::cout << "totalFidelities: " << totalFidelities << "\n";
 }
 
 void qc::NeutralAtomScheduler::printTotalExecutionTimes(
-    std::vector<fp>& totalExecutionTimes) {
+    std::vector<fp>& totalExecutionTimes, std::vector<fp>& blockedQubitsTimes) {
   std::cout << "ExecutionTime: "
             << "\n";
-  int i = 0;
-  for (auto qubit : totalExecutionTimes) {
-    std::cout << "[" << i++ << "] " << qubit << "\n";
+  for (size_t qubit = 0; qubit < totalExecutionTimes.size(); qubit++) {
+    std::cout << "[" << qubit << "] " << totalExecutionTimes[qubit] << " \t"
+              << blockedQubitsTimes[qubit] << "\n";
   }
 }

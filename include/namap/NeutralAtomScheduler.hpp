@@ -37,22 +37,17 @@ struct SchedulerResults {
 class NeutralAtomScheduler {
 protected:
   qc::NeutralAtomArchitecture arch;
-  std::vector<fp>             totalExecutionTimes;
-  fp                          totalIdleTime;
-  fp                          totalGateFidelities;
 
 public:
-  NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch)
-      : arch(arch), totalExecutionTimes(std::vector<fp>(arch.getNqubits(), 0)),
-        totalIdleTime(0), totalGateFidelities(1.0){};
+  NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch) : arch(arch) {}
 
   SchedulerResults schedule(qc::QuantumComputation& qc, bool verbose);
 
   static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
-                                    fp totalIdleTime, fp totalFidelities);
-  static void printTotalExecutionTimes(std::vector<fp>& totalExectuionTimes);
-  static void printQubitsInfo(std::set<unsigned int> qubits,
-                              qc::HardwareQubits     hardwareQubits);
+                                    fp totalIdleTime, fp totalGateFidelities,
+                                    fp totalFidelities);
+  static void printTotalExecutionTimes(std::vector<fp>& totalExectuionTimes,
+                                       std::vector<fp>& blockedQubitsTimes);
 };
 
 } // namespace qc
