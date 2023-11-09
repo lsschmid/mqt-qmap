@@ -8,7 +8,6 @@
 
 qc::SchedulerResults
 qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
-  CircuitOptimizer::decomposeSWAP(qc, false);
   if (verbose) {
     std::cout << "\n* schedule start!\n";
   }

@@ -98,7 +98,12 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
 }
 
 QuantumComputation NeutralAtomMapper::mapAod(qc::QuantumComputation& qc) {
-  qc::CircuitOptimizer::decomposeSWAP(this->mappedQc, false);
+  // decompose SWAP gates
+  CircuitOptimizer::decomposeSWAP(qc, false);
+  CircuitOptimizer::replaceMCXWithMCZ(qc);
+  CircuitOptimizer::singleQubitGateFusion(qc);
+  CircuitOptimizer::flattenOperations(qc);
+  // decompose AOD moves
   AodScheduler scheduler(this->arch);
   return scheduler.schedule(qc);
 }
