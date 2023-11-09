@@ -14,9 +14,11 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   }
 
   std::vector<fp> totalExecutionTimes(arch.getNpositions(), 0);
-  std::vector<fp> blockedQubitsTimes(arch.getNpositions(), 0);
-  fp              totalGateTime       = 0;
-  fp              totalGateFidelities = 1;
+  // saves for each coord the time slots that are blocked by a multi qubit gate
+  std::vector<std::deque<std::pair<fp, fp>>> blockedQubitsTimes(
+      arch.getNpositions(), std::deque<std::pair<fp, fp>>());
+  fp totalGateTime       = 0;
+  fp totalGateFidelities = 1;
 
   int index = 0;
   for (const auto& op : qc) {
@@ -45,9 +47,26 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       // multi qubit gates -> take into consideration blocking
       auto blockedQubits = arch.getBlockedCoordIndices(op.get());
       // get max execution time over all blocked qubits
-      for (const auto& qubit : blockedQubits) {
-        maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
-        maxTime = std::max(maxTime, blockedQubitsTimes[qubit]);
+      bool blocked = true;
+      while (blocked) {
+        // get regular max execution time
+        for (const auto& qubit : qubits) {
+          maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
+        }
+        // check if all blocked qubits are free at maxTime
+        blocked = false;
+        for (const auto& qubit : blockedQubits) {
+          // check if qubit is blocked at maxTime
+          if (!blockedQubitsTimes[qubit].empty() &&
+              blockedQubitsTimes[qubit].front().first < maxTime &&
+              blockedQubitsTimes[qubit].front().second > maxTime) {
+            blocked = true;
+            // update maxTime to the end of the blocking
+            maxTime = blockedQubitsTimes[qubit].front().second;
+            // remove the blocking
+            break;
+          }
+        }
       }
 
       // update total execution times
@@ -55,7 +74,7 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
         totalExecutionTimes[qubit] = maxTime + opTime;
       }
       for (const auto& qubit : blockedQubits) {
-        blockedQubitsTimes[qubit] = maxTime + opTime;
+        blockedQubitsTimes[qubit].emplace_back(maxTime, maxTime + opTime);
       }
 
     } else {
@@ -63,6 +82,11 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       // get max execution time over all qubits
       for (const auto& qubit : qubits) {
         maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
+        // remove all blocked times that are smaller than maxTime
+        while (!blockedQubitsTimes[qubit].empty() &&
+               blockedQubitsTimes[qubit].front().second < maxTime) {
+          blockedQubitsTimes[qubit].pop_front();
+        }
       }
       // update total execution times
       for (const auto& qubit : qubits) {
@@ -108,11 +132,15 @@ void qc::NeutralAtomScheduler::printSchedulerResults(
 }
 
 void qc::NeutralAtomScheduler::printTotalExecutionTimes(
-    std::vector<fp>& totalExecutionTimes, std::vector<fp>& blockedQubitsTimes) {
+    std::vector<fp>&                            totalExecutionTimes,
+    std::vector<std::deque<std::pair<fp, fp>>>& blockedQubitsTimes) {
   std::cout << "ExecutionTime: "
             << "\n";
   for (size_t qubit = 0; qubit < totalExecutionTimes.size(); qubit++) {
-    std::cout << "[" << qubit << "] " << totalExecutionTimes[qubit] << " \t"
-              << blockedQubitsTimes[qubit] << "\n";
+    std::cout << "[" << qubit << "] " << totalExecutionTimes[qubit] << " \t";
+    for (const auto& blockedTime : blockedQubitsTimes[qubit]) {
+      std::cout << blockedTime.first << "-" << blockedTime.second << " \t";
+    }
+    std::cout << "\n";
   }
 }

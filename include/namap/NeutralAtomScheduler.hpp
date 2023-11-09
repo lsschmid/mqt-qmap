@@ -46,8 +46,9 @@ public:
   static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
                                     fp totalIdleTime, fp totalGateFidelities,
                                     fp totalFidelities);
-  static void printTotalExecutionTimes(std::vector<fp>& totalExectuionTimes,
-                                       std::vector<fp>& blockedQubitsTimes);
+  static void printTotalExecutionTimes(
+      std::vector<fp>&                            totalExectuionTimes,
+      std::vector<std::deque<std::pair<fp, fp>>>& blockedQubitsTimes);
 };
 
 } // namespace qc
