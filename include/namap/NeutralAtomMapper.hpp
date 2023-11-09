@@ -14,7 +14,7 @@
 
 namespace qc {
 
-using GateList = std::set<const Operation*>;
+using GateList = std::vector<const Operation*>;
 
 struct MapperParameters {
   fp lookaheadWeightSwaps          = 0.1;
@@ -62,15 +62,15 @@ protected:
   bool           verbose = true;
 
   // Methods for layer creation
-  void createFrontLayer();
-  void updateFrontLayerByGate(std::set<const Operation*>& gatesToExecute);
-  void updateFrontLayerByQubit();
-  void updateFrontLayerByCandidates();
-  void findFrontCandidates();
-  void updateLookaheadLayerByQubit();
-  void findLookaheadCandidates();
-  void updateLookaheadLayerByCandidates();
-  void mapGate(const Operation* op);
+  void        createFrontLayer();
+  void        updateFrontLayerByGate(GateList& gatesToExecute);
+  void        updateFrontLayerByQubit();
+  void        updateFrontLayerByCandidates();
+  void        findFrontCandidates();
+  void        updateLookaheadLayerByQubit();
+  void        findLookaheadCandidates();
+  void        updateLookaheadLayerByCandidates();
+  void        mapGate(const Operation* op);
   static bool commutesWithAtQubit(const GateList&  layer,
                                   const Operation* opPointer,
                                   const Qubit&     qubit);
