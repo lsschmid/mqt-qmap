@@ -493,7 +493,7 @@ AodScheduler::AodActivationHelper::getAodOperation(
   if (type == OpType::AodActivate) {
     return std::make_pair(initOp, offsetOp);
   }
-  return std::make_pair(initOp, offsetOp);
+  return std::make_pair(offsetOp, initOp);
 }
 
 std::vector<AodOperation>
