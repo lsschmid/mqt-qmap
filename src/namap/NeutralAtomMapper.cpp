@@ -1132,6 +1132,7 @@ fp NeutralAtomMapper::parallelMoveCost(const qc::AtomMove& move) {
 
 MoveCombs NeutralAtomMapper::getAllPossibleMoveCombinations() {
   MoveCombs allMoves;
+  bool      foundSingleMove = false;
   for (const auto& op : this->frontLayerShuttling) {
     MoveCombs movesOp;
     auto      usedQubits   = op->getUsedQubits();
@@ -1143,8 +1144,12 @@ MoveCombs NeutralAtomMapper::getAllPossibleMoveCombinations() {
       auto moves21 = getNearbyMoveCombinations(q2, q1);
       movesOp.addMoveCombs(moves12);
       movesOp.addMoveCombs(moves21);
-      // TODO test if one should always include move away in both directions
-      if (movesOp.empty()) {
+      if (!moves12.empty() || !moves21.empty()) {
+        foundSingleMove = true;
+      }
+      // of for another gate a single move was found, skip
+      // the move away part
+      if (movesOp.empty() && !foundSingleMove) {
         auto moves1 = getMoveAwayCombinationsNearby(q1, q2);
         auto moves2 = getMoveAwayCombinationsNearby(q2, q1);
         movesOp.addMoveCombs(moves1);
