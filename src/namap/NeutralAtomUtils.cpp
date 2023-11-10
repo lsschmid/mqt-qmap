@@ -17,11 +17,24 @@ bool MoveVector::overlap(const qc::MoveVector& other) const {
   const auto secondStartY = std::min(other.yStart, other.yEnd);
   const auto secondEndY   = std::max(other.yStart, other.yEnd);
 
-  auto overlapXStart = firstStartX >= secondStartX && firstStartX <= secondEndX;
-  auto overlapXEnd   = firstEndX >= secondStartX && firstEndX <= secondEndX;
-  auto overlapYStart = firstStartY >= secondStartY && firstStartY <= secondEndY;
-  auto overlapYEnd   = firstEndY >= secondStartY && firstEndY <= secondEndY;
-  return (overlapXStart || overlapXEnd) && (overlapYStart || overlapYEnd);
+  // need to compute all combinations, as sometimes the start and end x/y points
+  // are the same
+  auto overlapXFirstStart =
+      firstStartX >= secondStartX && firstStartX <= secondEndX;
+  auto overlapXFirstEnd = firstEndX >= secondStartX && firstEndX <= secondEndX;
+  auto overlapXSecondStart =
+      secondStartX >= firstStartX && secondStartX <= firstEndX;
+  auto overlapXSecondEnd = secondEndX >= firstStartX && secondEndX <= firstEndX;
+  auto overlapYFirstStart =
+      firstStartY >= secondStartY && firstStartY <= secondEndY;
+  auto overlapYFirstEnd = firstEndY >= secondStartY && firstEndY <= secondEndY;
+  auto overlapYSecondStart =
+      secondStartY >= firstStartY && secondStartY <= firstEndY;
+  auto overlapYSecondEnd = secondEndY >= firstStartY && secondEndY <= firstEndY;
+
+  return (overlapXFirstStart || overlapXFirstEnd || overlapXSecondStart ||
+          overlapXSecondEnd || overlapYFirstStart || overlapYFirstEnd ||
+          overlapYSecondStart || overlapYSecondEnd);
 }
 
 bool MoveVector::include(const qc::MoveVector& other) const {
