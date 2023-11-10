@@ -120,7 +120,8 @@ public:
   explicit AodScheduler(const NeutralAtomArchitecture& arch)
       : arch(arch), qcScheduled(arch.getNpositions()) {}
 
-  QuantumComputation schedule(QuantumComputation& qc);
+  QuantumComputation        schedule(QuantumComputation& qc);
+  [[nodiscard]] inline auto getNMoveGroups() const { return moveGroups.size(); }
 };
 
 } // namespace qc

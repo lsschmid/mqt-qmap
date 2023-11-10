@@ -105,7 +105,9 @@ QuantumComputation NeutralAtomMapper::mapAod(qc::QuantumComputation& qc) {
   CircuitOptimizer::flattenOperations(qc);
   // decompose AOD moves
   AodScheduler scheduler(this->arch);
-  return scheduler.schedule(qc);
+  auto         aodQc = scheduler.schedule(qc);
+  std::cout << "nMoveGroups: " << scheduler.getNMoveGroups() << '\n';
+  return aodQc;
 }
 
 void qc::NeutralAtomMapper::createFrontLayer() {
