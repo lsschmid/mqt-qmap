@@ -19,11 +19,15 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   fp totalGateTime       = 0;
   fp totalGateFidelities = 1;
 
-  int index = 0;
+  int index        = 0;
+  int nAodActivate = 0;
   for (const auto& op : qc) {
     index++;
     if (verbose) {
       std::cout << "\n" << index << "\n";
+    }
+    if (op->getType() == qc::AodActivate) {
+      nAodActivate++;
     }
 
     auto qubits     = op->getUsedQubits();
@@ -103,6 +107,9 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   //  if (verbose) {
   std::cout << "\n* schedule end!\n";
   //}
+  if (verbose) {
+    std::cout << "nAodActivate: " << nAodActivate << "\n";
+  }
 
   const auto maxExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
