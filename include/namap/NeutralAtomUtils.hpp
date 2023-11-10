@@ -153,8 +153,7 @@ struct MoveCombs {
 
   void addMoveComb(const MoveComb& moveComb);
   void addMoveCombs(const MoveCombs& otherMoveCombs);
-  void removeAllWithSameStart(const MoveComb& moveComb);
-  void removeAllWithSameEnd(const MoveComb& moveComb);
+  void removeLongerMoveCombs();
 };
 
 class Coordinate {

@@ -28,6 +28,23 @@ struct MapperParameters {
   fp shuttlingWeight               = 1;
 };
 
+struct MultiQubitMovePos {
+  CoordIndices coords;
+  size_t       nMoves;
+
+  // copy constructor
+  MultiQubitMovePos() : coords(), nMoves(0) {}
+  MultiQubitMovePos(const MultiQubitMovePos& other)
+      : coords(other.coords), nMoves(other.nMoves) {}
+
+  // copy assignment
+  MultiQubitMovePos& operator=(const MultiQubitMovePos& other) {
+    coords = other.coords;
+    nMoves = other.nMoves;
+    return *this;
+  }
+};
+
 class NeutralAtomMapper {
 protected:
   qc::NeutralAtomArchitecture            arch;
@@ -90,10 +107,12 @@ protected:
   GateList       getExecutableGates();
   std::set<Swap> getAllPossibleSwaps();
   AtomMove       findBestAtomMove();
-  MoveCombs      getAllPossibleMoveCombinations();
-  MoveCombs      getNearbyMoveCombinations(HwQubit start, HwQubit target);
-  MoveCombs      getMoveAwayCombinationsNearby(HwQubit start, HwQubit target);
   MoveCombs      getMoveAwayCombinations(CoordIndex start, CoordIndex target);
+  MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
+                                       const CoordIndices& gateCoords,
+                                       const size_t&       maxNMoves);
+  MoveCombs         getBestPossibleMoveCombinations();
+  MultiQubitMovePos getBestMovePos(const CoordIndices& gateCoords);
 
   void updateMapping(Swap swap);
   void updateMappingMove(AtomMove move);
@@ -114,13 +133,10 @@ protected:
   HwQubits getBestMultiQubitPositionRec(const HwQubits& gateQubits,
                                         HwQubits        selectedQubits,
                                         HwQubits        remainingQubits);
-  std::vector<std::set<CoordIndex>>
-  getClosestFreePosition(const HwQubits& gateQubits);
   std::vector<std::pair<SwapOrMove, fp>>
-  getExactMoveToPosition(const Operation* op, HwQubits position);
-  MoveCombs
-  getMoveCombinationsToPosition(HwQubits&                          gateQubits,
-                                std::vector<std::set<CoordIndex>>& positions);
+            getExactMoveToPosition(const Operation* op, HwQubits position);
+  MoveCombs getMoveCombinationsToPosition(HwQubits&                gateQubits,
+                                          std::vector<CoordIndex>& position);
   // temp
   void printLayers();
 

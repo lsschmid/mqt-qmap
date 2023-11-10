@@ -71,22 +71,18 @@ void MoveCombs::addMoveCombs(const qc::MoveCombs& otherMoveCombs) {
   }
 }
 
-void MoveCombs::removeAllWithSameStart(const qc::MoveComb& moveComb) {
-  moveCombs.erase(std::remove_if(moveCombs.begin(), moveCombs.end(),
-                                 [&moveComb](const MoveComb& comb) {
-                                   return comb.getFirstMove().first ==
-                                          moveComb.getFirstMove().first;
-                                 }),
-                  moveCombs.end());
-}
-
-void MoveCombs::removeAllWithSameEnd(const qc::MoveComb& moveComb) {
-  moveCombs.erase(std::remove_if(moveCombs.begin(), moveCombs.end(),
-                                 [&moveComb](const MoveComb& comb) {
-                                   return comb.getLastMove().second ==
-                                          moveComb.getLastMove().second;
-                                 }),
-                  moveCombs.end());
+void MoveCombs::removeLongerMoveCombs() {
+  size_t minSize = std::numeric_limits<uint32_t>::max();
+  for (const auto& comb : moveCombs) {
+    minSize = std::min(minSize, comb.size());
+  }
+  for (auto it = moveCombs.begin(); it != moveCombs.end();) {
+    if (it->size() > minSize) {
+      it = moveCombs.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 } // namespace qc
