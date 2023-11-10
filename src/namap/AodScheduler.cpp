@@ -255,8 +255,8 @@ void AodScheduler::AodActivationHelper::reAssignOffsets(
   for (auto* aodMove : aodMoves) {
     if (std::signbit(aodMove->delta) == std::signbit(sign)) {
       aodMove->offset = offset;
+      offset += sign;
     }
-    offset += sign;
   }
 }
 
