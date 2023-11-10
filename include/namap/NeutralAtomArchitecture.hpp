@@ -61,11 +61,11 @@ class NeutralAtomArchitecture {
   };
 
   struct Parameters {
-    CoordIndex           nQubits;
-    std::map<OpType, fp> gateTimes;
-    std::map<OpType, fp> gateAverageFidelities;
-    std::map<OpType, fp> shuttlingTimes;
-    std::map<OpType, fp> shuttlingAverageFidelities;
+    CoordIndex                nQubits;
+    std::map<std::string, fp> gateTimes;
+    std::map<std::string, fp> gateAverageFidelities;
+    std::map<OpType, fp>      shuttlingTimes;
+    std::map<OpType, fp>      shuttlingAverageFidelities;
     class DecoherenceTimes {
     protected:
       fp tEff;
@@ -146,18 +146,22 @@ public:
   [[nodiscard]] std::set<CoordIndex>
   getBlockedCoordIndices(const Operation* op) const;
 
-  [[nodiscard]] inline fp getGateTime(OpType opType) const {
-    if (parameters.gateTimes.find(opType) == parameters.gateTimes.end()) {
-      return parameters.gateTimes.at(OpType::None);
+  [[nodiscard]] inline fp getGateTime(std::string s) const {
+    if (parameters.gateTimes.find(s) == parameters.gateTimes.end()) {
+      std::cout << "Gate time for " << s << " not found\n"
+                << "Returning default value\n";
+      return parameters.gateTimes.at("none");
     }
-    return parameters.gateTimes.at(opType);
+    return parameters.gateTimes.at(s);
   }
-  [[nodiscard]] inline fp getGateAverageFidelity(OpType opType) const {
-    if (parameters.gateAverageFidelities.find(opType) ==
+  [[nodiscard]] inline fp getGateAverageFidelity(std::string s) const {
+    if (parameters.gateAverageFidelities.find(s) ==
         parameters.gateAverageFidelities.end()) {
-      return parameters.gateAverageFidelities.at(OpType::None);
+      std::cout << "Gate average fidelity for " << s << " not found\n"
+                << "Returning default value\n";
+      return parameters.gateAverageFidelities.at("none");
     }
-    return parameters.gateAverageFidelities.at(opType);
+    return parameters.gateAverageFidelities.at(s);
   }
   [[nodiscard]] inline fp getShuttlingTime(OpType shuttlingType) const {
     return parameters.shuttlingTimes.at(shuttlingType);

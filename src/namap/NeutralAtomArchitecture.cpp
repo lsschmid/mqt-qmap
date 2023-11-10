@@ -35,15 +35,15 @@ void NeutralAtomArchitecture::loadJson(const std::string& filename) {
     this->parameters                        = Parameters();
     this->parameters.nQubits                = jsonDataParameters["nQubits"];
 
-    std::map<OpType, fp> gateTimes;
+    std::map<std::string, fp> gateTimes;
     for (const auto& [key, value] : jsonDataParameters["gateTimes"].items()) {
-      gateTimes.insert({OP_NAME_TO_TYPE.at(key), value});
+      gateTimes.insert({key, value});
     }
     this->parameters.gateTimes = gateTimes;
-    std::map<OpType, fp> gateAverageFidelities;
+    std::map<std::string, fp> gateAverageFidelities;
     for (const auto& [key, value] :
          jsonDataParameters["gateAverageFidelities"].items()) {
-      gateAverageFidelities.insert({OP_NAME_TO_TYPE.at(key), value});
+      gateAverageFidelities.insert({key, value});
     }
     this->parameters.gateAverageFidelities = gateAverageFidelities;
     std::map<OpType, fp> shuttlingTimes;
@@ -52,6 +52,20 @@ void NeutralAtomArchitecture::loadJson(const std::string& filename) {
          jsonDataParameters["shuttlingTimes"].items()) {
       shuttlingTimes.insert({OP_NAME_TO_TYPE.at(key), value});
     }
+    // compute values for SWAP gate
+    fp swapGateTime     = 0;
+    fp swapGateFidelity = 1;
+    for (size_t i = 0; i < 3; ++i) {
+      swapGateTime += gateTimes.at("cz");
+      swapGateFidelity *= gateAverageFidelities.at("cz");
+    }
+    for (size_t i = 0; i < 6; ++i) {
+      swapGateTime += gateTimes.at("h");
+      swapGateFidelity *= gateAverageFidelities.at("h");
+    }
+    this->parameters.gateTimes.insert({"swap", swapGateTime});
+    this->parameters.gateAverageFidelities.insert({"swap", swapGateFidelity});
+
     this->parameters.shuttlingTimes = shuttlingTimes;
     std::map<OpType, fp> shuttlingAverageFidelities;
     for (const auto& [key, value] :
@@ -191,7 +205,12 @@ fp NeutralAtomArchitecture::getOpTime(const Operation* op) const {
     const auto  distanceY = opAodMove->getMaxDistance(Dimension::Y);
     return (distanceX + distanceY) / v;
   }
-  return getGateTime(op->getType());
+  std::string opName;
+  for (size_t i = 0; i < op->getNcontrols(); ++i) {
+    opName += "c";
+  }
+  opName += op->getName();
+  return getGateTime(opName);
 }
 
 fp NeutralAtomArchitecture::getOpFidelity(const Operation* op) const {
@@ -200,7 +219,12 @@ fp NeutralAtomArchitecture::getOpFidelity(const Operation* op) const {
       op->getType() == OpType::AodMove) {
     return getShuttlingAverageFidelity(op->getType());
   }
-  return getGateAverageFidelity(op->getType());
+  std::string opName;
+  for (size_t i = 0; i < op->getNcontrols(); ++i) {
+    opName += "c";
+  }
+  opName += op->getName();
+  return getGateAverageFidelity(opName);
 }
 
 std::set<CoordIndex>
