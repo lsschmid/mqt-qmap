@@ -107,7 +107,7 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   const auto maxExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
   const auto totalIdleTime =
-      maxExecutionTime * arch.getNpositions() - totalGateTime;
+      maxExecutionTime * arch.getNqubits() - totalGateTime;
   const auto totalFidelities =
       totalGateFidelities *
       std::exp(-totalIdleTime / arch.getDecoherenceTime());
