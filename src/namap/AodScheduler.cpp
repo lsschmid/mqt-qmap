@@ -392,10 +392,8 @@ uint32_t AodScheduler::AodActivationHelper::getMaxOffset(Dimension dim,
   uint32_t maxOffset = 0;
   for (const auto& aodMove : aodMoves) {
     auto offset = aodMove->offset;
-    if (offset >= sign) {
-      maxOffset = std::max(maxOffset, static_cast<uint32_t>(offset));
-    } else {
-      maxOffset = std::max(maxOffset, static_cast<uint32_t>(-offset));
+    if (std::signbit(offset) == std::signbit(sign)) {
+      maxOffset = std::max(maxOffset, static_cast<uint32_t>(std::abs(offset)));
     }
   }
   return maxOffset;
