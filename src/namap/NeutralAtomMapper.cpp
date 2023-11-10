@@ -981,10 +981,10 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
 AtomMove NeutralAtomMapper::findBestAtomMove() {
   auto moveCombs = getAllPossibleMoveCombinations();
 
-  std::vector<std::pair<AtomMove, fp>> moveCosts;
+  std::vector<std::pair<MoveComb, fp>> moveCosts;
   moveCosts.reserve(moveCombs.size());
   for (const auto& moveComb : moveCombs) {
-    moveCosts.emplace_back(moveComb.getFirstMove(), moveCostComb(moveComb));
+    moveCosts.emplace_back(moveComb, moveCostComb(moveComb));
   }
 
   std::sort(moveCosts.begin(), moveCosts.end(),
@@ -997,7 +997,7 @@ AtomMove NeutralAtomMapper::findBestAtomMove() {
                                    [](const auto& move1, const auto& move2) {
                                      return move1.second < move2.second;
                                    });
-  return bestMove->first;
+  return bestMove->first.getFirstMove();
 }
 
 fp NeutralAtomMapper::moveCostComb(const qc::MoveComb& moveComb) {
