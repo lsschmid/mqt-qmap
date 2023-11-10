@@ -292,21 +292,20 @@ void AodScheduler::processMoveGroups() {
         aodDeactivationHelper.addActivation(deactivationCanAddXY, target, move,
                                             vReverse);
       }
-      // remove from current move group
-      for (const auto& moveToRemove : movesToRemove) {
-        groupIt->moves.erase(
-            std::remove_if(groupIt->moves.begin(), groupIt->moves.end(),
-                           [&moveToRemove](const auto& movePair) {
-                             return movePair.first == moveToRemove;
-                           }),
-            groupIt->moves.end());
-      }
-      if (!possibleNewMoveGroup.moves.empty()) {
-        groupIt =
-            moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
-        possibleNewMoveGroup = MoveGroup{arch};
-        groupIt--;
-      }
+    }
+    // remove from current move group
+    for (const auto& moveToRemove : movesToRemove) {
+      groupIt->moves.erase(
+          std::remove_if(groupIt->moves.begin(), groupIt->moves.end(),
+                         [&moveToRemove](const auto& movePair) {
+                           return movePair.first == moveToRemove;
+                         }),
+          groupIt->moves.end());
+    }
+    if (!possibleNewMoveGroup.moves.empty()) {
+      groupIt = moveGroups.insert(groupIt + 1, std::move(possibleNewMoveGroup));
+      possibleNewMoveGroup = MoveGroup{arch};
+      groupIt--;
     }
     groupIt->processedOpsInit   = aodActivationHelper.getAodOperations();
     groupIt->processedOpsFinal  = aodDeactivationHelper.getAodOperations();
