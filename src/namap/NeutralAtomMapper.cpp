@@ -13,6 +13,10 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
                                               InitialMapping initialMapping,
                                               bool           verboseArg) {
   qc::CircuitOptimizer::removeFinalMeasurements(qc);
+  qc::CircuitOptimizer::replaceMCXWithMCZ(qc);
+  qc::CircuitOptimizer::singleQubitGateFusion(qc);
+  qc::CircuitOptimizer::flattenOperations(qc);
+
   this->dag     = qc::CircuitOptimizer::constructDAG(qc);
   this->mapping = Mapping(qc.getNqubits(), initialMapping);
   for (auto& i : dag) {
