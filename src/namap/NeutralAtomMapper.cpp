@@ -693,24 +693,38 @@ void NeutralAtomMapper::initSwapAndMove(
     if (usedQubits.size() == 2) {
       swapCloseBy.emplace_back(*usedHwQubits.begin(), *usedHwQubits.rbegin());
     } else {
-      auto bestPos = getBestMultiQubitPosition(gate);
+      auto bestPositions = getBestMultiQubitPositions(gate);
       if (verbose) {
-        std::cout << "bestPos: ";
-        for (auto qubit : bestPos) {
-          std::cout << qubit << " ";
+        for (const auto& bestPos : bestPositions) {
+          std::cout << "bestPos: ";
+          for (auto qubit : bestPos) {
+            std::cout << qubit << " ";
+          }
+          std::cout << '\t';
         }
         std::cout << '\n';
       }
-      auto exactMoves = getExactMoveToPosition(gate, bestPos);
-      moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
+      for (const auto& bestPos : bestPositions) {
+        auto exactMoves = getExactMoveToPosition(gate, bestPos);
+        moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
+      }
     }
   }
+  // sort and remove duplicates from moveExact
+  moveExact.erase(std::unique(moveExact.begin(), moveExact.end(),
+                              [](const auto& move1, const auto& move2) {
+                                return move1.first == move2.first;
+                              }),
+                  moveExact.end());
+
   // compute minimal cost of exact moves
-  auto minCost          = std::min_element(moveExact.begin(), moveExact.end(),
-                                           [](const auto& move1, const auto& move2) {
-                                    return move1.second < move2.second;
-                                  });
-  this->swapCloseByCost = minCost->second;
+  if (!moveExact.empty()) {
+    auto minCost          = std::min_element(moveExact.begin(), moveExact.end(),
+                                             [](const auto& move1, const auto& move2) {
+                                      return move1.second < move2.second;
+                                    });
+    this->swapCloseByCost = minCost->second;
+  }
 }
 
 fp NeutralAtomMapper::distancePerLayer(
@@ -768,82 +782,106 @@ fp NeutralAtomMapper::distancePerLayer(
   return distChange;
 }
 
-HwQubits NeutralAtomMapper::getBestMultiQubitPosition(const Operation* op) {
+std::vector<HwQubits>
+NeutralAtomMapper::getBestMultiQubitPositions(const Operation* op) {
   // try to find position around gate Qubits recursively
   // if not, search through coupling graph until found according to a
   // priority queue based on the distance to the other qubits
-  std::priority_queue<std::pair<fp, HwQubit>,
-                      std::vector<std::pair<fp, HwQubit>>,
-                      std::greater<std::pair<fp, HwQubit>>>
-       qubitQueue;
-  auto gateQubits   = op->getUsedQubits();
-  auto gateHwQubits = this->mapping.getHwQubits(gateQubits);
-  // add the gate qubits to the priority queue
-  for (const auto& gateQubit : gateHwQubits) {
-    fp totalDist = 0;
-    for (const auto& otherGateQubit : gateHwQubits) {
-      if (gateQubit == otherGateQubit) {
-        continue;
-      }
-      totalDist +=
-          this->hardwareQubits.getSwapDistance(gateQubit, otherGateQubit, true);
-    }
-    qubitQueue.emplace(totalDist, gateQubit);
-  }
 
-  // run through the priority queue until a position is found
-  std::set<HwQubit> visitedQubits;
-  while (!qubitQueue.empty()) {
-    auto qubit = qubitQueue.top().second;
-    visitedQubits.insert(qubit);
-    qubitQueue.pop();
+  std::vector<HwQubits> bestPositions = {};
+  // do this for all gate qubits
+  auto       gateQubits   = op->getUsedQubits();
+  const auto gateHwQubits = this->mapping.getHwQubits(gateQubits);
 
-    // remove selected qubit from the gate qubits
-    auto tempGateHwQubits = gateHwQubits;
-    tempGateHwQubits.erase(tempGateHwQubits.find(qubit));
-    auto bestPos = getBestMultiQubitPositionRec(
-        tempGateHwQubits, {qubit}, this->hardwareQubits.getNearbyQubits(qubit));
-    if (!bestPos.empty()) {
-      return bestPos;
-    }
-    // add nearby qubits to the priority queue
-    for (const auto& nearbyQubit :
-         this->hardwareQubits.getNearbyQubits(qubit)) {
-      if (visitedQubits.find(nearbyQubit) != visitedQubits.end()) {
-        continue;
+  // compute best position for each gate qubit
+  for (const auto& centerHwQubit : gateHwQubits) {
+    std::priority_queue<std::pair<fp, HwQubit>,
+                        std::vector<std::pair<fp, HwQubit>>,
+                        std::greater<std::pair<fp, HwQubit>>>
+        qubitQueue;
+    // add the gate qubits to the priority queue
+    qubitQueue.emplace(0, centerHwQubit);
+
+    // run through the priority queue until a position is found
+    std::set<HwQubit> visitedQubits;
+    while (!qubitQueue.empty()) {
+      auto qubit = qubitQueue.top().second;
+      visitedQubits.insert(qubit);
+      qubitQueue.pop();
+
+      // remove selected qubit from the gate qubits
+      auto tempGateHwQubits = gateHwQubits;
+      if (tempGateHwQubits.find(qubit) != tempGateHwQubits.end()) {
+        tempGateHwQubits.erase(tempGateHwQubits.find(qubit));
       }
-      // compute total distance to all other gate qubits
-      fp totalDist = 0;
-      for (const auto& otherGateQubit : gateHwQubits) {
-        if (nearbyQubit == otherGateQubit) {
+      auto bestPos = getBestMultiQubitPositionRec(
+          tempGateHwQubits, {qubit},
+          this->hardwareQubits.getNearbyQubits(qubit));
+      if (!bestPos.empty()) {
+        bestPositions.push_back(bestPos);
+        break;
+      }
+      // add nearby qubits to the priority queue
+      for (const auto& nearbyQubit :
+           this->hardwareQubits.getNearbyQubits(qubit)) {
+        if (visitedQubits.find(nearbyQubit) != visitedQubits.end()) {
           continue;
         }
-        totalDist +=
-            this->hardwareQubits.getSwapDistance(nearbyQubit, otherGateQubit);
+        // compute total distance to all other gate qubits
+        fp totalDist = 0;
+        for (const auto& otherGateQubit : gateHwQubits) {
+          if (nearbyQubit == otherGateQubit) {
+            continue;
+          }
+          totalDist +=
+              this->hardwareQubits.getSwapDistance(nearbyQubit, otherGateQubit);
+        }
+        qubitQueue.emplace(totalDist, nearbyQubit);
       }
-      qubitQueue.emplace(totalDist, nearbyQubit);
     }
   }
-  // find gate and move it to the shuttling layer
-  auto idxFrontGate =
-      std::find(this->frontLayerGate.begin(), this->frontLayerGate.end(), op);
-  if (idxFrontGate != this->frontLayerGate.end()) {
-    this->frontLayerGate.erase(idxFrontGate);
-    this->frontLayerShuttling.push_back(op);
+  if (bestPositions.empty()) {
+    // find gate and move it to the shuttling layer
+    auto idxFrontGate =
+        std::find(this->frontLayerGate.begin(), this->frontLayerGate.end(), op);
+    if (idxFrontGate != this->frontLayerGate.end()) {
+      this->frontLayerGate.erase(idxFrontGate);
+      this->frontLayerShuttling.push_back(op);
+    }
+    // remove from lookahead layer if there
+    auto idxLookaheadGate = std::find(this->lookaheadLayerGate.begin(),
+                                      this->lookaheadLayerGate.end(), op);
+    if (idxLookaheadGate != this->lookaheadLayerGate.end()) {
+      this->lookaheadLayerGate.erase(idxLookaheadGate);
+      this->lookaheadLayerShuttling.push_back(op);
+    }
   }
-  // remove from lookahead layer if there
-  auto idxLookaheadGate = std::find(this->lookaheadLayerGate.begin(),
-                                    this->lookaheadLayerGate.end(), op);
-  if (idxLookaheadGate != this->lookaheadLayerGate.end()) {
-    this->lookaheadLayerGate.erase(idxLookaheadGate);
-    this->lookaheadLayerShuttling.push_back(op);
-  }
-  return {};
+  return bestPositions;
 }
 
 HwQubits NeutralAtomMapper::getBestMultiQubitPositionRec(
     qc::HwQubits remainingGateQubits, qc::HwQubits selectedQubits,
     qc::HwQubits remainingNearbyQubits) {
+  // check if done
+  if (remainingGateQubits.empty()) {
+    return selectedQubits;
+  }
+  // update remainingNearbyQubits
+  auto newQubit        = *selectedQubits.rbegin();
+  auto nearbyNextQubit = this->hardwareQubits.getNearbyQubits(newQubit);
+  // compute remaining qubits as the intersection with current
+  Qubits newRemainingQubits;
+  std::set_intersection(
+      remainingNearbyQubits.begin(), remainingNearbyQubits.end(),
+      nearbyNextQubit.begin(), nearbyNextQubit.end(),
+      std::inserter(newRemainingQubits, newRemainingQubits.begin()));
+  for (const auto& qubit : selectedQubits) {
+    if (newRemainingQubits.find(qubit) != newRemainingQubits.end()) {
+      newRemainingQubits.erase(newRemainingQubits.find(qubit));
+    }
+  }
+  remainingNearbyQubits = newRemainingQubits;
+
   // if not enough space
   if (remainingNearbyQubits.size() < remainingGateQubits.size()) {
     return {};
@@ -854,7 +892,11 @@ HwQubits NeutralAtomMapper::getBestMultiQubitPositionRec(
     fp distance = 0;
     for (const auto& gateHwQubit : remainingGateQubits) {
       if (hwQubit == gateHwQubit) {
-        continue;
+        // gate qubit is already at one of the positions -> assign it
+        selectedQubits.insert(hwQubit);
+        remainingGateQubits.erase(remainingGateQubits.find(gateHwQubit));
+        return getBestMultiQubitPositionRec(remainingGateQubits, selectedQubits,
+                                            remainingNearbyQubits);
       }
       distance +=
           this->hardwareQubits.getSwapDistance(hwQubit, gateHwQubit, true);
@@ -883,19 +925,8 @@ HwQubits NeutralAtomMapper::getBestMultiQubitPositionRec(
   }
   remainingGateQubits.erase(remainingGateQubits.find(closesGateQubits));
 
-  // done if already sufficient number of qubits
-  if (remainingGateQubits.empty()) {
-    return selectedQubits;
-  }
-  auto nearbyNextQubit = this->hardwareQubits.getNearbyQubits(nextQubit);
-  // compute remaining qubits as the intersection with current
-  Qubits newRemainingQubits;
-  std::set_intersection(
-      remainingNearbyQubits.begin(), remainingNearbyQubits.end(),
-      nearbyNextQubit.begin(), nearbyNextQubit.end(),
-      std::inserter(newRemainingQubits, newRemainingQubits.begin()));
   return getBestMultiQubitPositionRec(remainingGateQubits, selectedQubits,
-                                      newRemainingQubits);
+                                      remainingNearbyQubits);
 }
 
 std::vector<std::pair<SwapOrMove, fp>>
