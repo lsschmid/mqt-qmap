@@ -117,20 +117,20 @@ protected:
   void updateMappingMove(AtomMove move);
 
   // Methods cost functions
-  fp   distanceCost(const Swap& swap);
-  void initSwapAndMove(const GateList&                         layer,
-                       std::vector<SwapOrMove>&                swapCloseBy,
-                       std::vector<std::pair<SwapOrMove, fp>>& moveExact);
-  fp   distancePerLayer(const Swap&                                   swap,
-                        const std::vector<SwapOrMove>&                swapCloseBy,
-                        const std::vector<std::pair<SwapOrMove, fp>>& moveExact);
-  fp   moveCost(const AtomMove& move);
-  fp   moveCostComb(const MoveComb& moveComb);
-  fp   moveDistancePerLayer(const AtomMove& move, GateList& layer);
-  fp   parallelMoveCost(const AtomMove& move);
-  std::vector<HwQubits> getBestMultiQubitPositions(const Operation* opPointer);
+  fp       distanceCost(const Swap& swap);
+  void     initSwapAndMove(const GateList&                         layer,
+                           std::vector<SwapOrMove>&                swapCloseBy,
+                           std::vector<std::pair<SwapOrMove, fp>>& moveExact);
+  fp       distancePerLayer(const Swap&                                   swap,
+                            const std::vector<SwapOrMove>&                swapCloseBy,
+                            const std::vector<std::pair<SwapOrMove, fp>>& moveExact);
+  fp       moveCost(const AtomMove& move);
+  fp       moveCostComb(const MoveComb& moveComb);
+  fp       moveDistancePerLayer(const AtomMove& move, GateList& layer);
+  fp       parallelMoveCost(const AtomMove& move);
+  HwQubits getBestMultiQubitPosition(const Operation* opPointer);
   HwQubits getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
-                                        HwQubits selectedQubits,
+                                        std::vector<HwQubit> selectedQubits,
                                         HwQubits remainingNearbyQubits);
   std::vector<std::pair<SwapOrMove, fp>>
             getExactMoveToPosition(const Operation* op, HwQubits position);
