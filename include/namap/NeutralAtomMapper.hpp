@@ -70,8 +70,9 @@ protected:
   std::deque<std::set<HwQubit>>          lastBlockedQubits;
   std::deque<AtomMove>                   lastMoves;
   std::vector<fp>                        decayWeights;
-  uint32_t                               nSwaps = 0;
-  uint32_t                               nMoves = 0;
+  uint32_t                               nSwaps          = 0;
+  uint32_t                               nMoves          = 0;
+  fp                                     swapCloseByCost = 1;
 
   //  NeutralAtomMappingResults   results;
   HardwareQubits hardwareQubits;

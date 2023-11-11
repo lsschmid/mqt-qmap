@@ -705,6 +705,12 @@ void NeutralAtomMapper::initSwapAndMove(
       moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
     }
   }
+  // compute minimal cost of exact moves
+  auto minCost          = std::min_element(moveExact.begin(), moveExact.end(),
+                                           [](const auto& move1, const auto& move2) {
+                                    return move1.second < move2.second;
+                                  });
+  this->swapCloseByCost = minCost->second;
 }
 
 fp NeutralAtomMapper::distancePerLayer(
@@ -733,7 +739,7 @@ fp NeutralAtomMapper::distancePerLayer(
     } else {
       continue;
     }
-    distChange += distAfter - distBefore;
+    distChange += (distAfter - distBefore) * this->swapCloseByCost;
   }
 
   // move qubits to the exact position for multi-qubit gates
@@ -756,8 +762,7 @@ fp NeutralAtomMapper::distancePerLayer(
     } else {
       continue;
     }
-    distChange +=
-        (distAfter - distBefore) / cost * parameters.multiQubitGateWeight;
+    distChange += (distAfter - distBefore) * cost;
   }
 
   return distChange;
@@ -899,12 +904,13 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   if (position.empty()) {
     return {};
   }
-  auto                                   gateQubits = op->getUsedQubits();
+  auto gateQubits   = op->getUsedQubits();
+  auto gateHwQubits = this->mapping.getHwQubits(gateQubits);
   std::vector<std::pair<SwapOrMove, fp>> exactMoves;
   while (!position.empty()) {
     std::vector<std::tuple<HwQubit, std::set<HwQubit>, fp>> minimalDistances;
     std::set<HwQubit> minimalDistancePosQubit;
-    for (const auto& gateQubit : gateQubits) {
+    for (const auto& gateQubit : gateHwQubits) {
       fp minimalDistance = std::numeric_limits<fp>::infinity();
       for (const auto& posQubit : position) {
         auto distance =
@@ -967,13 +973,13 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
       }
     }
 
-    // assign gateQubit to position by removing both from gateQubits and
+    // assign gateQubit to position by removing both from gateHwQubits and
     // position
-    gateQubits.erase(gateQubits.find(assignedGateQubit));
+    gateHwQubits.erase(gateHwQubits.find(assignedGateQubit));
     position.erase(position.find(assignedPosQubit));
     // and add to exactMove if not swap with one of the other qubits
     // only problem if their exact swap distance is 1
-    if (std::none_of(gateQubits.begin(), gateQubits.end(),
+    if (std::none_of(gateHwQubits.begin(), gateHwQubits.end(),
                      [&assignedGateQubit, this](const auto& qubit) {
                        return assignedGateQubit == qubit &&
                               this->hardwareQubits.getSwapDistance(
@@ -993,12 +999,13 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   }
   // add cost to the moves -> move first qubit corresponding to almost finished
   // positions
+  auto nQubits = op->getUsedQubits().size();
+  auto multiQubitFactor =
+      (static_cast<fp>(nQubits) * static_cast<fp>(nQubits - 1)) / 2;
   for (auto& move : exactMoves) {
     // TODO maybe add distance here also to cost -> qubits that are far of
     // are more likely to be moved first
-    move.second =
-        totalDistance; //- this->hardwareQubits.getSwapDistance(move.first,
-                       // move.second, false);
+    move.second = multiQubitFactor / totalDistance;
   }
 
   return exactMoves;
