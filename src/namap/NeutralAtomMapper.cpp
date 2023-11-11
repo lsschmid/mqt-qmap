@@ -55,8 +55,6 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
     // first do all gate based Mapping
     while (!this->frontLayerGate.empty()) {
       std::vector<const Operation*> gatesToExecute;
-      Swap lastSwap = {std::numeric_limits<uint32_t>::max(),
-                       std::numeric_limits<uint32_t>::max()};
       while (gatesToExecute.empty()) {
         ++i;
         if (this->verbose) {
@@ -66,7 +64,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         if (bestSwap.first == std::numeric_limits<uint32_t>::max()) {
           break;
         }
-        lastSwap = bestSwap;
+        this->lastSwap = bestSwap;
         updateMapping(bestSwap);
         //      auto bestMove = findBestAtomMove();
         //      updateMappingMove(bestMove);
@@ -89,6 +87,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         updateMappingMove(bestMove);
         gatesToExecute = getExecutableGates();
       }
+      this->lastSwap = Swap(0, 0);
       updateFrontLayerByGate(gatesToExecute);
       updateLookaheadLayerByQubit();
       if (this->verbose) {
@@ -622,6 +621,12 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   std::vector<std::pair<Swap, fp>> swapCosts;
   swapCosts.reserve(swaps.size());
   for (const auto& swap : swaps) {
+    if ((swap.first == this->lastSwap.first &&
+         swap.second == this->lastSwap.second) ||
+        (swap.first == this->lastSwap.second &&
+         swap.second == this->lastSwap.first)) {
+      continue;
+    }
     swapCosts.emplace_back(swap, distanceCost(swap));
   }
   std::sort(swapCosts.begin(), swapCosts.end(),

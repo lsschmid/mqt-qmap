@@ -66,6 +66,7 @@ protected:
   MapperParameters                       parameters;
   std::deque<std::set<HwQubit>>          lastBlockedQubits;
   std::deque<AtomMove>                   lastMoves;
+  Swap                                   lastSwap = Swap(0, 0);
   std::vector<fp>                        decayWeights;
   uint32_t                               nSwaps          = 0;
   uint32_t                               nMoves          = 0;
