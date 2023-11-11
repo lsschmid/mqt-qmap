@@ -70,6 +70,16 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         //      updateMappingMove(bestMove);
         gatesToExecute = getExecutableGates();
       }
+      // if executed gate on last swap, reset it
+      for (const auto& gate : gatesToExecute) {
+        auto       usedQubits   = gate->getUsedQubits();
+        const auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
+        if (usedHwQubits.find(this->lastSwap.first) != usedHwQubits.end() ||
+            usedHwQubits.find(this->lastSwap.second) != usedHwQubits.end()) {
+          this->lastSwap = Swap(0, 0);
+          break;
+        }
+      }
       updateFrontLayerByGate(gatesToExecute);
       updateLookaheadLayerByQubit();
       if (this->verbose) {
