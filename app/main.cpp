@@ -7,33 +7,30 @@
 #include "namap/NeutralAtomScheduler.hpp"
 
 int main(int argc, char* argv[]) {
-  if (argc != 17) {
-    std::cerr << "Usage: " << argv[0]
-              << " <runIdx> <input_directory> <output_directory> "
-                 "<lookaheadGate> <lookaheadShuttling> <gateDecay> "
-                 "<shuttlingTimeWeight> <shuttlingMakeExecutableBonus> "
-                 "<shuttlingMulitQubitWeight> <gateMulitQubitWeight> "
-                 "<gateWeight> <gateWeight> <verbose> <json_config_file_path> "
-                 "<initialCoordinateMapping> <initialCircuitMapping>\n";
+  if (argc != 14) {
+    std::cerr
+        << "Usage: " << argv[0]
+        << " <runIdx> <input_directory> <output_directory> "
+           "<lookaheadGate> <lookaheadShuttling> <gateDecay> "
+           "<shuttlingTimeWeight> "
+           "<gateWeight> <shuttlingWeight> <verbose> <json_config_file_path> "
+           "<initialCoordinateMapping> <initialCircuitMapping>\n";
     return 1;
   }
 
-  int         runIdx                       = std::atoi(argv[1]);
-  std::string input_directory              = argv[2];
-  std::string output_directory             = argv[3];
-  double      lookaheadGate                = std::stod(argv[4]);
-  double      lookaheadShuttling           = std::stod(argv[5]);
-  double      gateDecay                    = std::stod(argv[6]);
-  double      shuttlingTimeWeight          = std::stod(argv[7]);
-  double      shuttlingMakeExecutableBonus = std::stod(argv[8]);
-  double      shuttlingMulitQubitWeight    = std::stod(argv[9]);
-  double      gateMulitQubitWeight         = std::stod(argv[10]);
-  double      gateWeight                   = std::stod(argv[11]);
-  double      shuttlingWeight              = std::stod(argv[12]);
-  bool        verbose                      = std::atoi(argv[13]) != 0;
-  std::string json_config_file_path        = argv[14];
-  std::string initialCoordinateMapping     = argv[15];
-  std::string initialCircuitMapping        = argv[16];
+  int         runIdx                   = std::atoi(argv[1]);
+  std::string input_directory          = argv[2];
+  std::string output_directory         = argv[3];
+  double      lookaheadGate            = std::stod(argv[4]);
+  double      lookaheadShuttling       = std::stod(argv[5]);
+  double      gateDecay                = std::stod(argv[6]);
+  double      shuttlingTimeWeight      = std::stod(argv[7]);
+  double      gateWeight               = std::stod(argv[8]);
+  double      shuttlingWeight          = std::stod(argv[9]);
+  bool        verbose                  = std::atoi(argv[10]) != 0;
+  std::string json_config_file_path    = argv[11];
+  std::string initialCoordinateMapping = argv[12];
+  std::string initialCircuitMapping    = argv[13];
 
   // Check if the output directory exists and create it if it doesn't.
   if (!std::filesystem::exists(output_directory)) {
@@ -88,12 +85,8 @@ int main(int argc, char* argv[]) {
     mapperParameters.lookaheadWeightMoves = lookaheadShuttling;
     mapperParameters.decay                = gateDecay;
     mapperParameters.shuttlingTimeWeight  = shuttlingTimeWeight;
-    mapperParameters.shuttlingMakeExecutableBonus =
-        shuttlingMakeExecutableBonus;
-    mapperParameters.multiQubitGateWeight          = shuttlingMulitQubitWeight;
-    mapperParameters.multiQubitGateWeightShuttling = gateMulitQubitWeight;
-    mapperParameters.gateWeight                    = gateWeight;
-    mapperParameters.shuttlingWeight               = shuttlingWeight;
+    mapperParameters.gateWeight           = gateWeight;
+    mapperParameters.shuttlingWeight      = shuttlingWeight;
     mapper.setParameters(mapperParameters);
 
     std::cout << "Mapping " << qasmFile << "\n";
@@ -122,11 +115,6 @@ int main(int argc, char* argv[]) {
     ofs_params << "lookaheadShuttling: " << lookaheadShuttling << "\n";
     ofs_params << "gateDecay: " << gateDecay << "\n";
     ofs_params << "shuttlingTimeWeight: " << shuttlingTimeWeight << "\n";
-    ofs_params << "shuttlingMakeExecutableBonus: "
-               << shuttlingMakeExecutableBonus << "\n";
-    ofs_params << "shuttlingMulitQubitWeight: " << shuttlingMulitQubitWeight
-               << "\n";
-    ofs_params << "gateMulitQubitWeight: " << gateMulitQubitWeight << "\n";
     ofs_params << "gateWeight: " << gateWeight << "\n";
     ofs_params << "shuttlingWeight: " << shuttlingWeight << "\n";
     ofs_params << "verbose: " << verbose << "\n";
