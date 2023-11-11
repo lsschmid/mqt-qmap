@@ -130,9 +130,9 @@ protected:
   fp       moveDistancePerLayer(const AtomMove& move, GateList& layer);
   fp       parallelMoveCost(const AtomMove& move);
   HwQubits getBestMultiQubitPosition(const Operation* opPointer);
-  HwQubits getBestMultiQubitPositionRec(const HwQubits& gateQubits,
-                                        HwQubits        selectedQubits,
-                                        HwQubits        remainingQubits);
+  HwQubits getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
+                                        HwQubits selectedQubits,
+                                        HwQubits remainingNearbyQubits);
   std::vector<std::pair<SwapOrMove, fp>>
             getExactMoveToPosition(const Operation* op, HwQubits position);
   MoveCombs getMoveCombinationsToPosition(HwQubits&                gateQubits,
