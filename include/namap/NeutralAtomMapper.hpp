@@ -17,15 +17,12 @@ namespace qc {
 using GateList = std::vector<const Operation*>;
 
 struct MapperParameters {
-  fp lookaheadWeightSwaps          = 0.1;
-  fp lookaheadWeightMoves          = 0.1;
-  fp decay                         = 0.1;
-  fp shuttlingTimeWeight           = 1;
-  fp shuttlingMakeExecutableBonus  = 1;
-  fp multiQubitGateWeight          = 1;
-  fp multiQubitGateWeightShuttling = 1;
-  fp gateWeight                    = 1;
-  fp shuttlingWeight               = 1;
+  fp lookaheadWeightSwaps = 0.1;
+  fp lookaheadWeightMoves = 0.1;
+  fp decay                = 0.1;
+  fp shuttlingTimeWeight  = 1;
+  fp gateWeight           = 1;
+  fp shuttlingWeight      = 1;
 };
 
 struct MultiQubitMovePos {

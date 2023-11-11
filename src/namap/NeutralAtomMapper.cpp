@@ -1108,8 +1108,7 @@ fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
       auto usedQubits = gate->getUsedQubits();
       if (usedQubits.find(toMoveCircuitQubit) != usedQubits.end()) {
         // check distance reduction
-        fp distanceBefore   = 0;
-        fp executableBefore = 0;
+        fp distanceBefore = 0;
         for (const auto& qubit : usedQubits) {
           if (qubit == toMoveCircuitQubit) {
             continue;
@@ -1117,13 +1116,9 @@ fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
           auto hwQubit = this->mapping.getHwQubit(qubit);
           auto dist    = this->hardwareQubits.getSwapDistance(toMoveHwQubit,
                                                               hwQubit, true);
-          //                    distanceBefore += dist;
-          if (dist == 0) {
-            executableBefore++;
-          }
+          distanceBefore += dist;
         }
-        fp distanceAfter   = 0;
-        fp executableAfter = 0;
+        fp distanceAfter = 0;
         for (const auto& qubit : usedQubits) {
           if (qubit == toMoveCircuitQubit) {
             continue;
@@ -1131,15 +1126,9 @@ fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
           auto hwQubit = this->mapping.getHwQubit(qubit);
           auto dist =
               this->hardwareQubits.getSwapDistanceMove(move.second, hwQubit);
-          //                    distanceAfter += dist;
-          if (dist == 0) {
-            executableAfter++;
-          }
+          distanceAfter += dist;
         }
         distChange += distanceAfter - distanceBefore;
-        const auto execBonus = (executableAfter - executableBefore) *
-                               parameters.shuttlingMakeExecutableBonus;
-        distChange += execBonus;
       }
     }
   }
