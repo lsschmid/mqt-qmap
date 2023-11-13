@@ -10,8 +10,6 @@ qc::SchedulerResults
 qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   // decompose CX gates
   qc::CircuitOptimizer::replaceMCXWithMCZ(qc);
-  qc::CircuitOptimizer::singleQubitGateFusion(qc);
-  qc::CircuitOptimizer::flattenOperations(qc);
 
   if (verbose) {
     std::cout << "\n* schedule start!\n";
