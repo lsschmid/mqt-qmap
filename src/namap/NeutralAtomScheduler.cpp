@@ -8,6 +8,11 @@
 
 qc::SchedulerResults
 qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
+  // decompose CX gates
+  qc::CircuitOptimizer::replaceMCXWithMCZ(qc);
+  qc::CircuitOptimizer::singleQubitGateFusion(qc);
+  qc::CircuitOptimizer::flattenOperations(qc);
+
   if (verbose) {
     std::cout << "\n* schedule start!\n";
   }
@@ -19,8 +24,9 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   fp totalGateTime       = 0;
   fp totalGateFidelities = 1;
 
-  int index        = 0;
-  int nAodActivate = 0;
+  int      index        = 0;
+  int      nAodActivate = 0;
+  uint32_t nCZs         = 0;
   for (const auto& op : qc) {
     index++;
     if (verbose) {
@@ -28,6 +34,8 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
     }
     if (op->getType() == qc::AodActivate) {
       nAodActivate++;
+    } else if (op->getType() == qc::OpType::Z && op->getNcontrols() == 1) {
+      nCZs++;
     }
 
     auto qubits     = op->getUsedQubits();
@@ -122,8 +130,8 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
   printSchedulerResults(totalExecutionTimes, totalIdleTime, totalGateFidelities,
                         totalFidelities);
 
-  return {maxExecutionTime, totalIdleTime, totalGateFidelities,
-          totalFidelities};
+  return {maxExecutionTime, totalIdleTime, totalGateFidelities, totalFidelities,
+          nCZs};
 }
 
 void qc::NeutralAtomScheduler::printSchedulerResults(

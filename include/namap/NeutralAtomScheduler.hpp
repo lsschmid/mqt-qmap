@@ -9,16 +9,17 @@
 
 namespace qc {
 struct SchedulerResults {
-  fp totalExecutionTime;
-  fp totalIdleTime;
-  fp totalGateFidelities;
-  fp totalFidelities;
+  fp       totalExecutionTime;
+  fp       totalIdleTime;
+  fp       totalGateFidelities;
+  fp       totalFidelities;
+  uint32_t nCZs = 0;
 
   SchedulerResults(fp totalExecutionTime, fp totalIdleTime,
-                   fp totalGateFidelities, fp totalFidelities)
+                   fp totalGateFidelities, fp totalFidelities, uint32_t nCZs)
       : totalExecutionTime(totalExecutionTime), totalIdleTime(totalIdleTime),
         totalGateFidelities(totalGateFidelities),
-        totalFidelities(totalFidelities) {}
+        totalFidelities(totalFidelities), nCZs(nCZs) {}
 
   std::string inline toString() {
     std::stringstream ss;
