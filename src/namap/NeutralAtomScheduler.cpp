@@ -128,7 +128,7 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       std::exp(-totalIdleTime / arch.getDecoherenceTime());
 
   printSchedulerResults(totalExecutionTimes, totalIdleTime, totalGateFidelities,
-                        totalFidelities);
+                        totalFidelities, nCZs);
 
   return {maxExecutionTime, totalIdleTime, totalGateFidelities, totalFidelities,
           nCZs};
@@ -136,13 +136,14 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
 
 void qc::NeutralAtomScheduler::printSchedulerResults(
     std::vector<fp>& totalExecutionTimes, fp totalIdleTime,
-    fp totalGateFidelities, fp totalFidelities) {
+    fp totalGateFidelities, fp totalFidelities, uint32_t nCZs) {
   auto totalExecutionTime =
       *std::max_element(totalExecutionTimes.begin(), totalExecutionTimes.end());
   std::cout << "\ntotalExecutionTimes: " << totalExecutionTime << "\n";
   std::cout << "totalIdleTime: " << totalIdleTime << "\n";
   std::cout << "totalGateFidelities: " << totalGateFidelities << "\n";
   std::cout << "totalFidelities: " << totalFidelities << "\n";
+  std::cout << "totalnCZs: " << nCZs << "\n";
 }
 
 void qc::NeutralAtomScheduler::printTotalExecutionTimes(

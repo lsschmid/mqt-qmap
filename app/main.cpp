@@ -104,6 +104,7 @@ int main(int argc, char* argv[]) {
     // do the scheduling
     qc::NeutralAtomScheduler scheduler = qc::NeutralAtomScheduler(arch);
     auto schedulerResults = scheduler.schedule(qcAodMapped, verbose);
+
     // dump the results
     ofsResults << std::filesystem::path(qasmFile).filename().string() + ", " +
                       schedulerResults.toCsv() + "\n";

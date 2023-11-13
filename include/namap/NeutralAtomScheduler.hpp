@@ -46,7 +46,7 @@ public:
 
   static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
                                     fp totalIdleTime, fp totalGateFidelities,
-                                    fp totalFidelities);
+                                    fp totalFidelities, uint32_t nCZs);
   static void printTotalExecutionTimes(
       std::vector<fp>&                            totalExectuionTimes,
       std::vector<std::deque<std::pair<fp, fp>>>& blockedQubitsTimes);
