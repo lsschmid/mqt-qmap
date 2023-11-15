@@ -78,6 +78,7 @@ int main(int argc, char* argv[]) {
     qc::NeutralAtomArchitecture arch =
         qc::NeutralAtomArchitecture(json_config_file_path);
     // start mapping
+    auto startTime = std::chrono::high_resolution_clock::now();
     qc::NeutralAtomMapper mapper =
         qc::NeutralAtomMapper(arch, initialCoordinateMappingEnum);
     qc::MapperParameters mapperParameters;
@@ -101,6 +102,8 @@ int main(int argc, char* argv[]) {
                           std::filesystem::path(qasmFile).filename().string() +
                           "_" + std::to_string(runIdx) + ".qasm_aod");
     qcAodMapped.dumpOpenQASM(ofs_aod);
+    auto endTime = std::chrono::high_resolution_clock::now();
+    auto timeTaken = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
     // do the scheduling
     qc::NeutralAtomScheduler scheduler = qc::NeutralAtomScheduler(arch);
     auto schedulerResults = scheduler.schedule(qcAodMapped, verbose);
@@ -125,6 +128,7 @@ int main(int argc, char* argv[]) {
     ofs_params << "initialCircuitMapping: " << initialCircuitMapping << "\n";
     // close the file
     ofs_params.close();
+    std::cout << "* runtime: " << timeTaken << std::endl;
   }
 
   return 0;
