@@ -95,6 +95,7 @@ protected:
   bool        isExecutable(const Operation* opPointer);
   void        addToFrontLayer(const Operation* opPointer);
   void        addToLookaheadLayer(const Operation* opPointer);
+  void        reassignGatesToLayers();
 
   // Methods for estimation
   std::pair<uint32_t, fp> estimateNumSwapGates(const Operation* opPointer);

@@ -162,6 +162,35 @@ void qc::NeutralAtomMapper::updateFrontLayerByGate(GateList& gatesToExecute) {
     }
   }
   updateFrontLayerByQubit();
+  reassignGatesToLayers();
+}
+
+void NeutralAtomMapper::reassignGatesToLayers() {
+  // get all gates from gate and shuttling layer and check again
+  // if they belong to the layer
+  GateList allFrontGates;
+  allFrontGates.insert(allFrontGates.end(), this->frontLayerGate.begin(),
+                       this->frontLayerGate.end());
+  allFrontGates.insert(allFrontGates.end(), this->frontLayerShuttling.begin(),
+                       this->frontLayerShuttling.end());
+  this->frontLayerGate.clear();
+  this->frontLayerShuttling.clear();
+  for (const auto& gate : allFrontGates) {
+    addToFrontLayer(gate);
+  }
+
+  GateList allLookaheadGates;
+  allLookaheadGates.insert(allLookaheadGates.end(),
+                           this->lookaheadLayerGate.begin(),
+                           this->lookaheadLayerGate.end());
+  allLookaheadGates.insert(allLookaheadGates.end(),
+                           this->lookaheadLayerShuttling.begin(),
+                           this->lookaheadLayerShuttling.end());
+  this->lookaheadLayerGate.clear();
+  this->lookaheadLayerShuttling.clear();
+  for (const auto& gate : allLookaheadGates) {
+    addToLookaheadLayer(gate);
+  }
 }
 
 void qc::NeutralAtomMapper::updateFrontLayerByQubit() {
