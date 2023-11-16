@@ -626,7 +626,7 @@ void NeutralAtomMapper::updateMapping(qc::Swap swap) {
 
 void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
   this->lastMoves.push_back(move);
-  if (this->lastMoves.size() > this->arch.getNcolumns()) {
+  if (this->lastMoves.size() > 4) {
     this->lastMoves.pop_front();
   }
   mappedQc.move(move.first, move.second);
