@@ -1483,21 +1483,40 @@ std::pair<uint32_t, fp>
 NeutralAtomMapper::estimateNumSwapGates(const Operation* opPointer) {
   auto usedQubits   = opPointer->getUsedQubits();
   auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
-  fp   minDistance  = std::numeric_limits<fp>::infinity();
-  for (const auto& hwQubit : usedHwQubits) {
-    for (const auto& otherHwQubit : usedHwQubits) {
-      if (hwQubit == otherHwQubit) {
-        continue;
-      }
-      auto distance =
-          this->hardwareQubits.getSwapDistance(hwQubit, otherHwQubit);
-      if (distance < minDistance) {
-        minDistance = distance;
+  fp   minNumSwaps  = 0;
+  if (usedHwQubits.size() == 2) {
+    fp minDistance = std::numeric_limits<fp>::infinity();
+    for (const auto& hwQubit : usedHwQubits) {
+      for (const auto& otherHwQubit : usedHwQubits) {
+        if (hwQubit == otherHwQubit) {
+          continue;
+        }
+        auto distance =
+            this->hardwareQubits.getSwapDistance(hwQubit, otherHwQubit);
+        if (distance < minDistance) {
+          minDistance = distance;
+        }
       }
     }
+    minNumSwaps = minDistance;
+  } else { // multi-qubit gates
+    auto bestPos = getBestMultiQubitPosition(opPointer);
+    if (bestPos.empty()) {
+      return {std::numeric_limits<uint32_t>::max(),
+              std::numeric_limits<fp>::infinity()};
+    }
+    auto exactMoves = getExactMoveToPosition(opPointer, bestPos);
+    if (exactMoves.empty()) {
+      return {std::numeric_limits<uint32_t>::max(),
+              std::numeric_limits<fp>::infinity()};
+    }
+    for (const auto& move : exactMoves) {
+      auto [q1, q2] = move.first;
+      minNumSwaps += this->hardwareQubits.getSwapDistance(q1, q2, false);
+    }
   }
-  const auto minNumSwaps = static_cast<uint32_t>(std::ceil(minDistance));
-  const fp   minTime     = minNumSwaps * this->arch.getGateTime("swap");
+  const fp minTime =
+      static_cast<fp>(minNumSwaps) * this->arch.getGateTime("swap");
   return {minNumSwaps, minTime};
 }
 
@@ -1575,8 +1594,11 @@ bool NeutralAtomMapper::swapGateBetter(const Operation* opPointer) {
   auto fidMoves =
       std::exp(-minTimeMoves * this->arch.getNqubits() /
                this->arch.getDecoherenceTime()) *
-      std::pow(this->arch.getShuttlingAverageFidelity(OpType::AodMove),
-               minMoves);
+      std::pow(
+          this->arch.getShuttlingAverageFidelity(OpType::AodMove) *
+              this->arch.getShuttlingAverageFidelity(OpType::AodActivate) *
+              this->arch.getShuttlingAverageFidelity(OpType::AodDeactivate),
+          minMoves);
 
   return fidSwaps * parameters.gateWeight >
          fidMoves * parameters.shuttlingWeight;
