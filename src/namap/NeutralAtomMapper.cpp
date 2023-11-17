@@ -677,12 +677,6 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
                                    [](const auto& swap1, const auto& swap2) {
                                      return swap1.second < swap2.second;
                                    });
-  // none of the swaps helps
-  if (bestSwap->second == 0) {
-    // return empty swap
-    return {std::numeric_limits<Qubit>::max(),
-            std::numeric_limits<Qubit>::max()};
-  }
   return bestSwap->first;
 }
 
@@ -1144,6 +1138,7 @@ fp NeutralAtomMapper::moveCost(const AtomMove& move) {
                         static_cast<fp>(this->frontLayerShuttling.size());
     cost += parallelCost;
   }
+
   return cost;
 }
 
@@ -1164,8 +1159,9 @@ fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
             continue;
           }
           auto hwQubit = this->mapping.getHwQubit(qubit);
-          auto dist    = this->hardwareQubits.getSwapDistance(toMoveHwQubit,
-                                                              hwQubit, true);
+          auto dist    = this->arch.getEuclidianDistance(
+              this->hardwareQubits.getCoordIndex(hwQubit),
+              this->hardwareQubits.getCoordIndex(toMoveHwQubit));
           distanceBefore += dist;
         }
         fp distanceAfter = 0;
@@ -1174,8 +1170,8 @@ fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
             continue;
           }
           auto hwQubit = this->mapping.getHwQubit(qubit);
-          auto dist =
-              this->hardwareQubits.getSwapDistanceMove(move.second, hwQubit);
+          auto dist    = this->arch.getEuclidianDistance(
+              this->hardwareQubits.getCoordIndex(hwQubit), move.second);
           distanceAfter += dist;
         }
         distChange += distanceAfter - distanceBefore;
