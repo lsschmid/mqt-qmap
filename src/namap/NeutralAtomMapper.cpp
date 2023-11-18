@@ -992,7 +992,7 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   auto gateQubits   = op->getUsedQubits();
   auto gateHwQubits = this->mapping.getHwQubits(gateQubits);
   std::vector<std::pair<SwapOrMove, fp>> exactMoves;
-  while (!position.empty()) {
+  while (!position.empty() && !gateHwQubits.empty()) {
     std::vector<std::tuple<HwQubit, std::set<HwQubit>, fp>> minimalDistances;
     std::set<HwQubit> minimalDistancePosQubit;
     for (const auto& gateQubit : gateHwQubits) {
