@@ -1588,7 +1588,10 @@ NeutralAtomMapper::estimateNumMove(const Operation* opPointer) {
 
 bool NeutralAtomMapper::swapGateBetter(const Operation* opPointer) {
   auto [minNumSwaps, minTimeSwaps] = estimateNumSwapGates(opPointer);
-  auto [minMoves, minTimeMoves]    = estimateNumMove(opPointer);
+  if (minNumSwaps == 0) {
+    return true;
+  }
+  auto [minMoves, minTimeMoves] = estimateNumMove(opPointer);
   auto fidSwaps =
       std::exp(-minTimeSwaps * this->arch.getNqubits() /
                this->arch.getDecoherenceTime()) *
