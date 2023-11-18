@@ -245,7 +245,7 @@ void qc::NeutralAtomMapper::updateFrontLayerByCandidates() {
   this->frontQubitsToUpdate.clear();
   for (const auto& qubit : tempQubitsToUpdate) {
     std::vector<const Operation*> toRemove;
-    for (auto* opPointer : this->frontCandidates[qubit]) {
+    for (const auto* opPointer : this->frontCandidates[qubit]) {
       bool inFrontLayer = true;
       if (opPointer->getType() == qc::OpType::I) {
         toRemove.push_back(opPointer);
@@ -482,6 +482,12 @@ void qc::NeutralAtomMapper::mapGate(const Operation* op) {
   if (op->getType() == qc::OpType::I) {
     return;
   }
+  if (std::find(this->executedCommutingGates.begin(),
+                this->executedCommutingGates.end(),
+                op) != this->executedCommutingGates.end()) {
+    return;
+  }
+  this->executedCommutingGates.push_back(op);
   if (this->verbose) {
     std::cout << "mapped " << op->getName() << " ";
     for (auto qubit : op->getUsedQubits()) {
