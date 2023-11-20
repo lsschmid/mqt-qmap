@@ -48,6 +48,34 @@ macro(ADD_QMAP_LIBRARY libname srcfile)
   add_internal_library(${lib} ${srcfile})
 endmacro()
 
+# macro to add neutral atom mapping libraries
+macro(ADD_NAMAP_LIBRARY libname srcfile)
+  set(lib ${PROJECT_NAME}_${libname}_lib)
+
+  # main project library
+  add_library(
+    ${lib}
+    ${libname}/${srcfile}.cpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/${srcfile}.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomMappingResults.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomUtils.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomScheduler.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomArchitecture.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/HardwareQubits.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/Mapping.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/NeutralAtomDefinitions.hpp
+    ${PROJECT_SOURCE_DIR}/include/${libname}/AodScheduler.hpp
+    namap/NeutralAtomMappingResults.cpp
+    namap/NeutralAtomUtils.cpp
+    namap/NeutralAtomScheduler.cpp
+    namap/NeutralAtomArchitecture.cpp
+    namap/HardwareQubits.cpp
+    namap/Mapping.cpp
+    namap/AodScheduler.cpp)
+
+  add_internal_library(${lib} ${srcfile})
+endmacro()
+
 # macro to add synthesis libraries
 macro(ADD_SYNTHESIS_LIBRARY libname srcfile)
   set(lib ${PROJECT_NAME}_${libname}_lib)
@@ -94,6 +122,9 @@ target_link_libraries(${PROJECT_NAME}_cliffordsynthesis_lib PUBLIC logicblocks::
 
 # heuristic mapper project library
 add_qmap_library(heuristic HeuristicMapper)
+
+# add neutral atom mapper project library
+add_namap_library(namap NeutralAtomMapper)
 
 if(BUILD_MQT_QMAP_BINDINGS)
   add_subdirectory(python)

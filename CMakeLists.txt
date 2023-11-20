@@ -53,6 +53,9 @@ endif()
 # add main library code
 add_subdirectory(src)
 
+# add executables
+add_subdirectory(app)
+
 # add test code
 option(BUILD_MQT_QMAP_TESTS "Also build tests for the MQT QMAP project" ON)
 if(BUILD_MQT_QMAP_TESTS)
