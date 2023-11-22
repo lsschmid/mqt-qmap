@@ -814,22 +814,29 @@ fp NeutralAtomMapper::distancePerLayer(
     auto move        = moveWithCost.first;
     auto origin      = move.first;
     auto destination = move.second;
-    auto cost        = moveWithCost.second;
     distBefore =
         this->hardwareQubits.getSwapDistance(origin, destination, false);
     if (distBefore == std::numeric_limits<fp>::infinity()) {
       continue;
     }
     if (origin == swap.first) {
-      distAfter =
-          this->hardwareQubits.getSwapDistance(swap.second, destination, false);
+      if (destination == swap.second) {
+        distAfter = 0;
+      } else {
+        distAfter = this->hardwareQubits.getSwapDistance(swap.second,
+                                                         destination, false);
+      }
     } else if (origin == swap.second) {
-      distAfter =
-          this->hardwareQubits.getSwapDistance(swap.first, destination, false);
+      if (destination == swap.first) {
+        distAfter = 0;
+      } else {
+        distAfter = this->hardwareQubits.getSwapDistance(swap.first,
+                                                         destination, false);
+      }
     } else {
       continue;
     }
-    distChange += (distAfter - distBefore) * cost;
+    distChange += (distAfter - distBefore);
   }
 
   return distChange;
