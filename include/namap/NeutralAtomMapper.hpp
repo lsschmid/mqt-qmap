@@ -111,7 +111,7 @@ protected:
   MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
                                        const CoordIndices& gateCoords,
                                        const size_t&       maxNMoves);
-  MoveCombs         getBestPossibleMoveCombinations();
+  MoveCombs         getBestPossibleMoveCombinations(bool gateExecuted);
   MultiQubitMovePos getBestMovePos(const CoordIndices& gateCoords);
 
   void updateMapping(Swap swap);
@@ -136,7 +136,8 @@ protected:
   std::vector<std::pair<SwapOrMove, fp>>
             getExactMoveToPosition(const Operation* op, HwQubits position);
   MoveCombs getMoveCombinationsToPosition(HwQubits&                gateQubits,
-                                          std::vector<CoordIndex>& position);
+                                          std::vector<CoordIndex>& position,
+                                          bool gateExecuted);
   // temp
   void printLayers();
 
