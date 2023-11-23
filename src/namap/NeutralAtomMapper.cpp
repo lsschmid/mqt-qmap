@@ -86,7 +86,6 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         printLayers();
       }
     }
-    bool gateExecutedAfterShuttling = true;
     while (!this->frontLayerShuttling.empty()) {
       GateList gatesToExecute;
       while (gatesToExecute.empty()) {
@@ -94,12 +93,9 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         if (this->verbose) {
           std::cout << "iteration " << i << '\n';
         }
-        auto bestMove = findBestAtomMove(gateExecutedAfterShuttling);
+        auto bestMove = findBestAtomMove();
         updateMappingMove(bestMove);
         gatesToExecute = getExecutableGates();
-        if (gatesToExecute.empty()) {
-          gateExecutedAfterShuttling = false;
-        }
       }
       this->lastSwap = Swap(0, 0);
       updateFrontLayerByGate(gatesToExecute);
@@ -1105,8 +1101,8 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   return exactMoves;
 }
 
-AtomMove NeutralAtomMapper::findBestAtomMove(const bool gateExecuted) {
-  auto moveCombs = getBestPossibleMoveCombinations(gateExecuted);
+AtomMove NeutralAtomMapper::findBestAtomMove() {
+  auto moveCombs = getBestPossibleMoveCombinations();
 
   std::vector<std::pair<MoveComb, fp>> moveCosts;
   moveCosts.reserve(moveCombs.size());
@@ -1345,8 +1341,7 @@ NeutralAtomMapper::getMovePositionRec(MultiQubitMovePos   currentPos,
   return {};
 }
 
-MoveCombs
-NeutralAtomMapper::getBestPossibleMoveCombinations(bool gateExecuted) {
+MoveCombs NeutralAtomMapper::getBestPossibleMoveCombinations() {
   MoveCombs allMoves;
   for (const auto& op : this->frontLayerShuttling) {
     auto usedQubits    = op->getUsedQubits();
@@ -1355,8 +1350,7 @@ NeutralAtomMapper::getBestPossibleMoveCombinations(bool gateExecuted) {
     auto usedCoords =
         std::vector<CoordIndex>(usedCoordsSet.begin(), usedCoordsSet.end());
     auto bestPos = getBestMovePos(usedCoords);
-    auto moves   = getMoveCombinationsToPosition(usedHwQubits, bestPos.coords,
-                                                 gateExecuted);
+    auto moves   = getMoveCombinationsToPosition(usedHwQubits, bestPos.coords);
     allMoves.addMoveCombs(moves);
   }
   allMoves.removeLongerMoveCombs();
@@ -1419,8 +1413,7 @@ NeutralAtomMapper::getBestMovePos(const CoordIndices& gateCoords) {
 }
 
 MoveCombs NeutralAtomMapper::getMoveCombinationsToPosition(
-    qc::HwQubits& gateQubits, std::vector<CoordIndex>& position,
-    bool gateExecuted) {
+    qc::HwQubits& gateQubits, std::vector<CoordIndex>& position) {
   if (position.empty()) {
     throw QFRException("No position given");
   }
@@ -1477,19 +1470,9 @@ MoveCombs NeutralAtomMapper::getMoveCombinationsToPosition(
           getMoveAwayCombinations(currentGateQubit, bestCoord, remainingCoords);
       for (const auto& moveAway : moveAwayComb) {
         moveComb.append(moveAway);
-        //        if (!(!gateExecuted &&
-        //              moveAway.getFirstMove().first ==
-        //              this->lastMoves.back().second &&
-        //              moveAway.getFirstMove().second ==
-        //              this->lastMoves.back().first)){
-        //        }
       }
-    } else { // free coord
-             //      if (!(!gateExecuted &&
-             //            currentGateQubit == this->lastMoves.back().second &&
-             //            bestCoord == this->lastMoves.back().first)) {
+    } else {
       moveComb.append(AtomMove{currentGateQubit, bestCoord});
-      //      }
     }
     remainingGateCoords.erase(currentGateQubit);
     remainingCoords.erase(

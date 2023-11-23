@@ -106,13 +106,13 @@ protected:
   Swap              findBestSwap();
   GateList          getExecutableGates();
   std::set<Swap>    getAllPossibleSwaps();
-  AtomMove          findBestAtomMove(const bool gateExecuted);
+  AtomMove          findBestAtomMove();
   MoveCombs         getMoveAwayCombinations(CoordIndex start, CoordIndex target,
                                             const CoordIndices& excludedCoords);
   MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
                                        const CoordIndices& gateCoords,
                                        const size_t&       maxNMoves);
-  MoveCombs         getBestPossibleMoveCombinations(bool gateExecuted);
+  MoveCombs         getBestPossibleMoveCombinations();
   MultiQubitMovePos getBestMovePos(const CoordIndices& gateCoords);
 
   void updateMapping(Swap swap);
@@ -137,8 +137,7 @@ protected:
   std::vector<std::pair<SwapOrMove, fp>>
             getExactMoveToPosition(const Operation* op, HwQubits position);
   MoveCombs getMoveCombinationsToPosition(HwQubits&                gateQubits,
-                                          std::vector<CoordIndex>& position,
-                                          bool gateExecuted);
+                                          std::vector<CoordIndex>& position);
   // temp
   void printLayers();
 
