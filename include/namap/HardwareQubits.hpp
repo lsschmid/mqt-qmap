@@ -110,14 +110,15 @@ public:
   void move(HwQubit hwQubit, CoordIndex newCoord);
   void swap(HwQubit q1, HwQubit q2);
 
-  std::vector<Swap>       getNearbySwaps(HwQubit q);
-  std::set<CoordIndex>    getNearbyFreeCoordinates(HwQubit q);
-  std::set<CoordIndex>    getNearbyFreeCoordinatesByCoord(CoordIndex idx);
-  std::set<CoordIndex>    getNearbyOccupiedCoordinates(HwQubit q);
-  std::set<CoordIndex>    getNearbyOccupiedCoordinatesByCoord(CoordIndex idx);
-  fp                      getTotalDistance(std::set<HwQubit>& qubits);
-  std::set<HwQubit>       getBlockedQubits(const std::set<HwQubit>& qubits);
-  std::vector<CoordIndex> findClosestFreeCoord(HwQubit   qubit,
-                                               Direction direction);
+  std::vector<Swap>    getNearbySwaps(HwQubit q);
+  std::set<CoordIndex> getNearbyFreeCoordinates(HwQubit q);
+  std::set<CoordIndex> getNearbyFreeCoordinatesByCoord(CoordIndex idx);
+  std::set<CoordIndex> getNearbyOccupiedCoordinates(HwQubit q);
+  std::set<CoordIndex> getNearbyOccupiedCoordinatesByCoord(CoordIndex idx);
+  fp                   getTotalDistance(std::set<HwQubit>& qubits);
+  std::set<HwQubit>    getBlockedQubits(const std::set<HwQubit>& qubits);
+  std::vector<CoordIndex>
+  findClosestFreeCoord(HwQubit qubit, Direction direction,
+                       const CoordIndices& excludedCoords = {});
 };
 } // namespace qc

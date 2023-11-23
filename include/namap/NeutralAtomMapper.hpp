@@ -103,11 +103,12 @@ protected:
   bool                    swapGateBetter(const Operation* opPointer);
 
   // Methods for mapping
-  Swap           findBestSwap();
-  GateList       getExecutableGates();
-  std::set<Swap> getAllPossibleSwaps();
-  AtomMove       findBestAtomMove(const bool gateExecuted);
-  MoveCombs      getMoveAwayCombinations(CoordIndex start, CoordIndex target);
+  Swap              findBestSwap();
+  GateList          getExecutableGates();
+  std::set<Swap>    getAllPossibleSwaps();
+  AtomMove          findBestAtomMove(const bool gateExecuted);
+  MoveCombs         getMoveAwayCombinations(CoordIndex start, CoordIndex target,
+                                            const CoordIndices& excludedCoords);
   MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
                                        const CoordIndices& gateCoords,
                                        const size_t&       maxNMoves);
