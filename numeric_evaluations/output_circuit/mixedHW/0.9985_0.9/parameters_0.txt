@@ -1,0 +1,10 @@
+lookaheadGate: 0.1
+lookaheadShuttling: 0.1
+gateDecay: 0
+shuttlingTimeWeight: 0.1
+gateWeight: 0.9985
+shuttlingWeight: 0.9
+verbose: 0
+json_config_file_path: json/rubidium_mixed.json
+initialCoordinateMapping: trivial
+initialCircuitMapping: identity

@@ -1,0 +1,6 @@
+bn_2.qasm, 30043.6, 5.96903e+06,7.36902e-05
+qpeexact_nativegates_rigettie_qiskit_opt3_200.qasm, 599758, 1.19036e+08,2.59502e-51
+call_8.qasm, 29025.6, 5.76614e+06,4.36226e-07
+graphstate_nativegates_rigettie_qiskit_opt3_200.qasm, 11776.5, 2.32467e+06,0.0564359
+gray_binary_conversion_16.qasm, 9215.5, 1.83113e+06,0.00937627
+qft_nativegates_rigettie_qiskit_opt3_200.qasm, 342209, 6.79492e+07,7.75365e-32
