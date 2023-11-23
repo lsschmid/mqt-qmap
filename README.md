@@ -12,6 +12,8 @@ Until then, for any questions regarding the code please contact the authors of t
 The code is based on the MQT QMAP and the MQT Core repositories and can be installed according to the corresponding documentations following the instructions given in the "Development Guide" section.
 The cmake target of the Hybrid Mapper is called "NaMain" and defined in app/main.cpp.
 
+For the corresponding files of the paper, please refer to the last 3 commits.
+
 Now follows the original README.md of the MQT QMAP repository.
 
 [![PyPI](https://img.shields.io/pypi/v/mqt.qmap?logo=pypi&style=flat-square)](https://pypi.org/project/mqt.qmap/)
