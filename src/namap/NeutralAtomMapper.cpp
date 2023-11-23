@@ -86,6 +86,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         printLayers();
       }
     }
+    bool gateExecutedAfterShuttling = true;
     while (!this->frontLayerShuttling.empty()) {
       GateList gatesToExecute;
       while (gatesToExecute.empty()) {
@@ -93,9 +94,12 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         if (this->verbose) {
           std::cout << "iteration " << i << '\n';
         }
-        auto bestMove = findBestAtomMove();
+        auto bestMove = findBestAtomMove(gateExecutedAfterShuttling);
         updateMappingMove(bestMove);
         gatesToExecute = getExecutableGates();
+        if (gatesToExecute.empty()) {
+          gateExecutedAfterShuttling = false;
+        }
       }
       this->lastSwap = Swap(0, 0);
       updateFrontLayerByGate(gatesToExecute);
@@ -1103,12 +1107,19 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   return exactMoves;
 }
 
-AtomMove NeutralAtomMapper::findBestAtomMove() {
+AtomMove NeutralAtomMapper::findBestAtomMove(const bool gateExecuted) {
   auto moveCombs = getBestPossibleMoveCombinations();
 
   std::vector<std::pair<MoveComb, fp>> moveCosts;
   moveCosts.reserve(moveCombs.size());
   for (const auto& moveComb : moveCombs) {
+    if (!gateExecuted) {
+      // prevent moving back
+      if (moveComb.getFirstMove().first == this->lastMoves.back().second &&
+          moveComb.getFirstMove().second == this->lastMoves.back().first) {
+        continue;
+      }
+    }
     moveCosts.emplace_back(moveComb, moveCostComb(moveComb));
   }
 

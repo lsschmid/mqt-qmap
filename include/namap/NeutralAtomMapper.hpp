@@ -106,7 +106,7 @@ protected:
   Swap           findBestSwap();
   GateList       getExecutableGates();
   std::set<Swap> getAllPossibleSwaps();
-  AtomMove       findBestAtomMove();
+  AtomMove       findBestAtomMove(const bool gateExecuted);
   MoveCombs      getMoveAwayCombinations(CoordIndex start, CoordIndex target);
   MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
                                        const CoordIndices& gateCoords,
