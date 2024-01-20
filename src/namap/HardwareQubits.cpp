@@ -7,8 +7,7 @@
 #include "namap/Mapping.hpp"
 
 namespace qc {
-void HardwareQubits::initCompactSwapDistances() {
-  // only valid for trivial/compact initial layout
+void HardwareQubits::initTrivialSwapDistances() {
   swapDistances = SymmetricMatrix(arch.getNqubits());
   for (uint32_t i = 0; i < arch.getNqubits(); ++i) {
     for (uint32_t j = 0; j < i; ++j) {
@@ -70,8 +69,9 @@ void HardwareQubits::computeSwapDistance(HwQubit q1, HwQubit q2) {
   //  swapDistances(q1, q2) = static_cast<fp>(path.size() - 2);
 }
 
-void HardwareQubits::updateSwapDistances() {
-  // reset swap distances
+void HardwareQubits::resetSwapDistances() {
+  // TODO Improve to only reset the swap distances necessary (use a breadth
+  // first search)
   swapDistances = SymmetricMatrix(arch.getNqubits(), -1);
 }
 
@@ -103,7 +103,7 @@ void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord) {
   }
 
   // update/reset swap distances
-  updateSwapDistances();
+  resetSwapDistances();
 }
 
 std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
@@ -130,18 +130,18 @@ void HardwareQubits::computeNearbyQubits(qc::HwQubit q) {
   nearbyQubits.insert_or_assign(q, newNearbyQubits);
 }
 
-fp HardwareQubits::getTotalDistance(std::set<HwQubit>& hwQubits) {
+fp HardwareQubits::getAllToAllSwapDistance(std::set<HwQubit>& qubits) {
   // two qubit gates
-  if (hwQubits.size() == 2) {
-    auto it = hwQubits.begin();
+  if (qubits.size() == 2) {
+    auto it = qubits.begin();
     auto q1 = *it;
     auto q2 = *(++it);
     return getSwapDistance(q1, q2);
   }
   // for n > 2 all qubits need to be within the interaction radius of each other
   fp totalDistance = 0;
-  for (auto it1 = hwQubits.begin(); it1 != hwQubits.end(); ++it1) {
-    for (auto it2 = std::next(it1); it2 != hwQubits.end(); ++it2) {
+  for (auto it1 = qubits.begin(); it1 != qubits.end(); ++it1) {
+    for (auto it2 = std::next(it1); it2 != qubits.end(); ++it2) {
       totalDistance += getSwapDistance(*it1, *it2);
     }
   }
@@ -156,8 +156,7 @@ HardwareQubits::getBlockedQubits(const std::set<HwQubit>& qubits) {
       if (i == qubit) {
         continue;
       }
-      // do a preselection
-      // now check exact difference
+      // TODO improve by using the nearby coords as a preselection
       auto const distance =
           arch.getEuclidianDistance(hwToCoordIdx.at(qubit), hwToCoordIdx.at(i));
       if (distance <= arch.getBlockingFactor() * arch.getInteractionRadius()) {
@@ -234,8 +233,8 @@ HardwareQubits::findClosestFreeCoord(CoordIndex coord, Direction direction,
   return closestFreeCoords;
 }
 
-fp HardwareQubits::getSwapDistanceMove(CoordIndex idx, HwQubit target) {
-  // checks for a move coord the swap distance to the target
+[[maybe_unused]] fp HardwareQubits::getSwapDistanceMove(CoordIndex idx,
+                                                        HwQubit    target) {
   auto nearbyCoords    = this->arch.getNearbyCoordinates(idx);
   fp   minSwapDistance = std::numeric_limits<fp>::infinity();
   if (nearbyCoords.find(this->getCoordIndex(target)) != nearbyCoords.end()) {
