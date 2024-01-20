@@ -8,6 +8,9 @@
 #include "namap/NeutralAtomArchitecture.hpp"
 
 namespace qc {
+/**
+ * @brief Struct to store the results of the scheduler
+ */
 struct SchedulerResults {
   fp       totalExecutionTime;
   fp       totalIdleTime;
@@ -35,15 +38,34 @@ struct SchedulerResults {
   }
 };
 
+/**
+ * @brief Class to schedule a quantum circuit on a neutral atom architecture
+ * @details For each gate/operation in the input circuit, the scheduler checks the
+ * earliest possible time slot for execution. If the gate is a multi qubit gate,
+ * also the blocking of other qubits is taken into consideration.
+ * The execution times are read from the neutral atom architecture.
+ */
 class NeutralAtomScheduler {
 protected:
   qc::NeutralAtomArchitecture arch;
 
 public:
+  // Constructor
   NeutralAtomScheduler(const qc::NeutralAtomArchitecture& arch) : arch(arch) {}
 
+  /**
+   * @brief Schedules the given quantum circuit on the neutral atom architecture
+   * @details For each gate/operation in the input circuit, the scheduler checks the
+   * earliest possible time slot for execution. If the gate is a multi qubit gate,
+   * also the blocking of other qubits is taken into consideration.
+   * The execution times are read from the neutral atom architecture.
+   * @param qc Quantum circuit to schedule
+   * @param verbose If true, prints additional information
+   * @return SchedulerResults
+   */
   SchedulerResults schedule(qc::QuantumComputation& qc, bool verbose);
 
+  // Helper Print functions
   static void printSchedulerResults(std::vector<fp>& totalExecutionTimes,
                                     fp totalIdleTime, fp totalGateFidelities,
                                     fp totalFidelities, uint32_t nCZs);
