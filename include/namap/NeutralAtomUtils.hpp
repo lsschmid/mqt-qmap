@@ -190,7 +190,7 @@ public:
   }
 
   [[nodiscard]] inline CoordIndex
-  getManhattenDistanceX(const Coordinate& c) const {
+  getManhattanDistanceX(const Coordinate& c) const {
     if (x > c.x) {
       return x - c.x;
     } else {
@@ -198,7 +198,7 @@ public:
     }
   }
   [[nodiscard]] inline CoordIndex
-  getManhattenDistanceY(const Coordinate& c) const {
+  getManhattanDistanceY(const Coordinate& c) const {
     if (y > c.y) {
       return y - c.y;
     } else {

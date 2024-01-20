@@ -139,8 +139,8 @@ void NeutralAtomArchitecture::computeSwapDistances(fp interactionRadius) {
   for (uint32_t coordIndex1 = 0; coordIndex1 < this->getNpositions();
        coordIndex1++) {
     for (uint32_t coordIndex2 = 0; coordIndex2 < coordIndex1; coordIndex2++) {
-      auto deltaX = this->getManhattenDistanceX(coordIndex1, coordIndex2);
-      auto deltaY = this->getManhattenDistanceY(coordIndex1, coordIndex2);
+      auto deltaX = this->getManhattanDistanceX(coordIndex1, coordIndex2);
+      auto deltaY = this->getManhattanDistanceY(coordIndex1, coordIndex2);
 
       // check if one can go diagonal to reduce the swap distance
       uint32_t swapDistance = 0;
