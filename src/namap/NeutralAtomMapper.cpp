@@ -513,7 +513,7 @@ bool qc::NeutralAtomMapper::isExecutable(const Operation* opPointer) {
   for (auto qubit : usedQubits) {
     usedHwQubits.insert(this->mapping.getHwQubit(qubit));
   }
-  return this->hardwareQubits.getTotalDistance(usedHwQubits) == 0;
+  return this->hardwareQubits.getAllToAllSwapDistance(usedHwQubits) == 0;
 }
 
 void qc::NeutralAtomMapper::addToFrontLayer(const Operation* opPointer) {

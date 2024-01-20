@@ -10,15 +10,17 @@
 
 namespace qc {
 
-// Symmetric matrix class with same number of rows and columns that allows
-// access by row and column but uses less memory than a full matrix
-
+/**
+ * @brief Symmetric matrix class with same number of rows and columns that
+ * allows access by row and column but uses less memory than a full matrix
+ */
 class SymmetricMatrix {
 private:
   std::vector<std::vector<fp>> data;
   uint32_t                     size = 0;
 
 public:
+  // Constructors
   SymmetricMatrix() = default;
   explicit SymmetricMatrix(uint32_t size) : size(size) {
     data.resize(size);
@@ -51,9 +53,14 @@ public:
   [[nodiscard]] inline uint32_t getSize() const { return size; }
 };
 
+// Enums for the different initial mappings strategies
 enum InitialCoordinateMapping { Trivial, Random };
 enum InitialMapping { Identity };
 
+/**
+ * @brief Helperclass to represent a direction in x and y coordinates.
+ * @details The boolean value corresponds to right/left and down/up.
+ */
 struct Direction {
   bool x;
   bool y;
@@ -71,6 +78,11 @@ struct Direction {
   [[nodiscard]] inline int32_t getSignY() const { return y ? 1 : -1; }
 };
 
+/**
+ * @brief Helperclass to represent a move of an atom from one position to
+ * another.
+ * @details Each move consists in a start and end coordinate and the direction.
+ */
 struct MoveVector {
   fp        xStart;
   fp        yStart;
@@ -92,6 +104,11 @@ struct MoveVector {
   [[nodiscard]] bool include(const MoveVector& other) const;
 };
 
+/**
+ * @brief Helperclass to manage multiple atom moves which belong together.
+ * @details E.g. a move-away combined with the actual move. These are combined
+ * in a MoveComb to facilitate the cost calculation.
+ */
 struct MoveComb {
   std::vector<AtomMove> moves;
   fp                    cost = std::numeric_limits<fp>::quiet_NaN();
@@ -105,8 +122,18 @@ struct MoveComb {
   MoveComb(std::vector<AtomMove> moves) : moves(std::move(moves)) {}
   MoveComb(AtomMove move) : moves(std::vector<AtomMove>{std::move(move)}) {}
 
+  /**
+   * @brief Get the first move of the combination
+   * @return The first move of the combination
+   */
   [[nodiscard]] AtomMove inline getFirstMove() const { return *moves.begin(); }
+
+  /**
+   * @brief Get the last move of the combination
+   * @return The last move of the combination
+   */
   [[nodiscard]] AtomMove inline getLastMove() const { return *moves.rbegin(); }
+
   // implement == operator for AtomMove
   [[nodiscard]] inline bool operator==(const MoveComb& other) const {
     return moves == other.moves;
@@ -115,10 +142,18 @@ struct MoveComb {
     return !(*this == other);
   }
 
+  /**
+   * @brief Append a single move to the end of the combination.
+   * @param addMove The move to append
+   */
   inline void append(AtomMove& addMove) {
     moves.push_back(addMove);
     cost = std::numeric_limits<fp>::quiet_NaN();
   }
+  /**
+   * @brief Append all moves of another combination to the end of this one.
+   * @param addMoveComb The other combination to append
+   */
   inline void append(const MoveComb& addMoveComb) {
     moves.insert(moves.end(), addMoveComb.moves.begin(),
                  addMoveComb.moves.end());
@@ -127,13 +162,11 @@ struct MoveComb {
   [[nodiscard]] inline size_t size() const { return moves.size(); }
   [[nodiscard]] inline bool   empty() const { return moves.empty(); }
 
-  [[nodiscard]] inline bool containsCoord(CoordIndex idx) {
-    return std::any_of(moves.begin(), moves.end(), [idx](const AtomMove& move) {
-      return move.first == idx || move.second == idx;
-    });
-  }
 };
 
+/**
+ * @brief Helperclass to manage multiple move combinations.
+ */
 struct MoveCombs {
   std::vector<MoveComb> moveCombs;
 
@@ -151,11 +184,27 @@ struct MoveCombs {
   const_iterator begin() const { return moveCombs.begin(); }
   const_iterator end() const { return moveCombs.end(); }
 
+  /**
+   * @brief Add a move combination to the list of move combinations.
+   * @param moveComb The move combination to add.
+   */
   void addMoveComb(const MoveComb& moveComb);
+  /**
+   * @brief Add all move combinations of another MoveCombs object to the list of
+   * move combinations.
+   * @param otherMoveCombs The other MoveCombs object to add.
+   */
   void addMoveCombs(const MoveCombs& otherMoveCombs);
+  /**
+   * @brief Remove all move combinations that are longer than the shortest move
+   * combination.
+   */
   void removeLongerMoveCombs();
 };
 
+/**
+ * @brief Helperclass to facilitate the handling of x/y coordinates.
+ */
 class Coordinate {
 protected:
   std::uint32_t x;
