@@ -97,7 +97,7 @@ int main(int argc, char* argv[]) {
                       std::filesystem::path(qasmFile).filename().string() +
                       "_" + std::to_string(runIdx) + ".qasm_ext");
     qcMapped.dumpOpenQASM(ofs);
-    auto          qcAodMapped = mapper.mapAod(qcMapped);
+    auto          qcAodMapped = mapper.convertToAod(qcMapped);
     std::ofstream ofs_aod(output_directory + "/" +
                           std::filesystem::path(qasmFile).filename().string() +
                           "_" + std::to_string(runIdx) + ".qasm_aod");

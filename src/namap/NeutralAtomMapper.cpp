@@ -65,7 +65,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
           break;
         }
         this->lastSwap = bestSwap;
-        updateMapping(bestSwap);
+        updateMappingSwap(bestSwap);
         //      auto bestMove = findBestAtomMove();
         //      updateMappingMove(bestMove);
         gatesToExecute = getExecutableGates();
@@ -110,7 +110,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
   return mappedQc;
 }
 
-QuantumComputation NeutralAtomMapper::mapAod(qc::QuantumComputation& qc) {
+QuantumComputation NeutralAtomMapper::convertToAod(qc::QuantumComputation& qc) {
   // decompose SWAP gates
   CircuitOptimizer::decomposeSWAP(qc, false);
   CircuitOptimizer::replaceMCXWithMCZ(qc);
@@ -437,8 +437,7 @@ void qc::NeutralAtomMapper::findLookaheadCandidates() {
 
     // iterate until end or lookahead depth reached
     uint32_t foundMultiQubitGate = 0;
-    while (lookaheadIter < this->dag[qubit].end() &&
-           foundMultiQubitGate < this->lookaheadDepth) {
+    while (lookaheadIter < this->dag[qubit].end()) {
       auto* opPointer = (*lookaheadIter)->get();
       if (opPointer->getType() == qc::OpType::I) {
         lookaheadIter++;
@@ -600,7 +599,7 @@ GateList NeutralAtomMapper::getExecutableGates() {
   return executableGates;
 }
 
-void NeutralAtomMapper::updateMapping(qc::Swap swap) {
+void NeutralAtomMapper::updateMappingSwap(Swap swap) {
   nSwaps++;
   // save to lastSwaps
   this->lastBlockedQubits.push_back(
@@ -672,7 +671,7 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
          swap.second == this->lastSwap.first)) {
       continue;
     }
-    swapCosts.emplace_back(swap, distanceCost(swap));
+    swapCosts.emplace_back(swap, swapCost(swap));
   }
   std::sort(swapCosts.begin(), swapCosts.end(),
             [](const auto& swap1, const auto& swap2) {
@@ -710,14 +709,14 @@ std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
   return swaps;
 }
 
-fp NeutralAtomMapper::distanceCost(const qc::Swap& swap) {
+fp NeutralAtomMapper::swapCost(const Swap& swap) {
   // compute the change in total distance
   auto distanceChangeFront =
-      distancePerLayer(swap, this->swapCloseByFront, this->moveExactFront) /
+      swapCostPerLayer(swap, this->swapCloseByFront, this->moveExactFront) /
       static_cast<fp>(this->frontLayerGate.size());
   fp distanceChangeLookahead = 0;
   if (!this->lookaheadLayerGate.empty()) {
-    distanceChangeLookahead = distancePerLayer(swap, this->swapCloseByLookahead,
+    distanceChangeLookahead = swapCostPerLayer(swap, this->swapCloseByLookahead,
                                                this->moveExactLookahead) /
                               static_cast<fp>(this->lookaheadLayerGate.size());
   }
@@ -745,6 +744,7 @@ void NeutralAtomMapper::initSwapAndMove(
     std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
   swapCloseBy.clear();
   moveExact.clear();
+  // computes for each gate the necessary moves to execute it
   for (const auto& gate : layer) {
     auto usedQubits   = gate->getUsedQubits();
     auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
@@ -780,8 +780,8 @@ void NeutralAtomMapper::initSwapAndMove(
   }
 }
 
-fp NeutralAtomMapper::distancePerLayer(
-    const qc::Swap& swap, const std::vector<SwapOrMove>& swapCloseBy,
+fp NeutralAtomMapper::swapCostPerLayer(
+    const Swap& swap, const std::vector<SwapOrMove>& swapCloseBy,
     const std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
   fp distBefore = 0;
   fp distAfter  = 0;
@@ -1133,12 +1133,11 @@ fp NeutralAtomMapper::moveCostComb(const qc::MoveComb& moveComb) {
 
 fp NeutralAtomMapper::moveCost(const AtomMove& move) {
   fp   cost      = 0;
-  auto frontCost = moveDistancePerLayer(move, this->frontLayerShuttling) /
+  auto frontCost = moveCostPerLayer(move, this->frontLayerShuttling) /
                    static_cast<fp>(this->frontLayerShuttling.size());
   cost += frontCost;
   if (!lookaheadLayerShuttling.empty()) {
-    auto lookaheadCost =
-        moveDistancePerLayer(move, this->lookaheadLayerShuttling) /
+    auto lookaheadCost = moveCostPerLayer(move, this->lookaheadLayerShuttling) /
         static_cast<fp>(this->lookaheadLayerShuttling.size());
     cost += parameters.lookaheadWeightMoves * lookaheadCost;
   }
@@ -1153,8 +1152,7 @@ fp NeutralAtomMapper::moveCost(const AtomMove& move) {
   return cost;
 }
 
-fp NeutralAtomMapper::moveDistancePerLayer(const qc::AtomMove& move,
-                                           qc::GateList&       layer) {
+fp NeutralAtomMapper::moveCostPerLayer(const AtomMove& move, GateList& layer) {
   // compute cost assuming the move was applied
   fp   distChange    = 0;
   auto toMoveHwQubit = this->hardwareQubits.getHwQubit(move.first);
@@ -1488,6 +1486,7 @@ NeutralAtomMapper::getMoveAwayCombinations(CoordIndex          startCoord,
   MoveCombs  moveCombinations;
   auto const originalVector    = this->arch.getVector(startCoord, targetCoord);
   auto const originalDirection = originalVector.direction;
+  // Find move away target in the same direction as the original move
   auto       moveAwayTargets   = this->hardwareQubits.findClosestFreeCoord(
       targetCoord, originalDirection, exludeCoords);
   for (const auto& moveAwayTarget : moveAwayTargets) {
