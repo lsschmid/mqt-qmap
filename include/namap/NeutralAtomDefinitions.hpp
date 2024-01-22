@@ -27,5 +27,6 @@ using SwapOrMove   = std::pair<HwQubit, HwQubit>; // TODO remove unclear naming
 
 // Used to represent operations
 using OpPointer    = std::unique_ptr<AodOperation>;
+using GateList = std::vector<const Operation*>;
 
 } // namespace qc

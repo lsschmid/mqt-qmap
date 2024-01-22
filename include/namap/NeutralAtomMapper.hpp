@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include "NeutralAtomLayer.hpp"
 #include "NeutralAtomMappingResults.hpp"
 #include "QuantumComputation.hpp"
 #include "namap/AodScheduler.hpp"
@@ -13,8 +14,6 @@
 #include "namap/NeutralAtomUtils.hpp"
 
 namespace qc {
-
-using GateList = std::vector<const Operation*>;
 
 /**
  * @brief Struct to store the runtime parameters of the mapper.
@@ -61,14 +60,6 @@ protected:
   GateList frontLayerGate;
   // Gates in the front layer to be executed with move operations
   GateList frontLayerShuttling;
-  // The qubits for which the front layers need to be updated
-  std::set<Qubit> frontQubitsToUpdate;
-  // Gates that could be added to the front layer based on commutation rules
-  std::vector<GateList> frontCandidates;
-  // The DAG of the quantum circuit
-  DAG dag;
-  // The iterators for the DAG, indicating the current position in the DAG
-  DAGIterators frontLayerIterators;
   // Possible swaps for the front layer
   std::vector<SwapOrMove> swapCloseByFront;
   // Possible moves for the front layer
@@ -77,12 +68,6 @@ protected:
   GateList lookaheadLayerGate;
   // Gates in the lookahead layer to be executed with move operations
   GateList lookaheadLayerShuttling;
-  // the offset, the lookahead layer has to the front layer iterators
-  std::vector<uint32_t> lookaheadOffsets;
-  // Gates that could be added to the lookahead layer based on commutation rules
-  std::vector<GateList> lookaheadCandidates;
-  // The qubits for which the lookahead layers need to be updated
-  std::set<Qubit> lookaheadQubitsToUpdate;
   // Possible swaps for the lookahead layer
   std::vector<SwapOrMove> swapCloseByLookahead;
   // Possible moves for the lookahead layer
@@ -93,8 +78,6 @@ protected:
   std::deque<std::set<HwQubit>> lastBlockedQubits;
   // The last moves that have been executed
   std::deque<AtomMove> lastMoves;
-  // The last swap that has been executed
-  Swap lastSwap = Swap(0, 0);
   // Precomputed decay weights
   std::vector<fp> decayWeights;
   // Counter variables
@@ -112,24 +95,11 @@ protected:
 
   // Methods for layer creation
   // TODO move layer management to separate class
-  void        createFrontLayer();
-  void        updateFrontLayerByGate(GateList& gatesToExecute);
-  void        updateFrontLayerByQubit();
-  void        updateFrontLayerByCandidates();
-  void        findFrontCandidates();
-  void        updateLookaheadLayerByQubit();
-  void        findLookaheadCandidates();
-  void        updateLookaheadLayerByCandidates();
-  void        mapGate(const Operation* op);
-  static bool commutesWithAtQubit(const GateList&  layer,
-                                  const Operation* opPointer,
-                                  const Qubit&     qubit);
-  static bool commuteAtQubit(const Operation* opPointer1,
-                             const Operation* opPointer2, const Qubit& qubit);
-  bool        isExecutable(const Operation* opPointer);
-  void        addToFrontLayer(const Operation* opPointer);
-  void        addToLookaheadLayer(const Operation* opPointer);
-  void        reassignGatesToLayers();
+  void mapGate(const Operation* op);
+
+  bool isExecutable(const Operation* opPointer);
+  void reassignGatesToLayers(const GateList& frontGates,
+                             const GateList& lookaheadGates);
 
   // Methods for estimation
   /**
@@ -168,10 +138,11 @@ protected:
    */
   Swap findBestSwap();
   /**
-   * @brief Returns all gates of the front layer that can be executed now
-   * @return All gates of the front layer that can be executed now
+   * @brief Returns all gates that can be executed now
+   * @param gates The gates to be checked
+   * @return All gates that can be executed now
    */
-  GateList getExecutableGates();
+  GateList getExecutableGates(const GateList& gates);
   /**
    * @brief Returns all possible swap gates for the front layer.
    * @details The possible swap gates are all swaps starting from qubits in the
@@ -179,6 +150,12 @@ protected:
    * @return All possible swap gates for the front layer
    */
   std::set<Swap> getAllPossibleSwaps();
+  /**
+   * @brief Maps all currently possible gates and updated until no more gates
+   * can be mapped.
+   * @param layer The layer to map all possible gates for
+   */
+  void mapAllPossibleGates(NeutralAtomLayer& layer);
   /**
    * @brief Returns the next best shuttling move operation for the front layer.
    * @return The next best shuttling move operation for the front layer
