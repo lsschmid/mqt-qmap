@@ -5,11 +5,11 @@
 #pragma once
 
 #include "limits"
+#include "map"
 #include "namap/NeutralAtomArchitecture.hpp"
 #include "namap/NeutralAtomDefinitions.hpp"
 #include "namap/NeutralAtomUtils.hpp"
 #include "random"
-#include "map"
 
 namespace qc {
 
@@ -23,11 +23,10 @@ namespace qc {
  */
 class HardwareQubits {
 protected:
-  NeutralAtomArchitecture arch;
+  NeutralAtomArchitecture     arch;
   Permutation                 hwToCoordIdx;
   SymmetricMatrix             swapDistances;
   std::map<HwQubit, HwQubits> nearbyQubits;
-
 
   /**
    * @brief Initializes the swap distances between the hardware qubits for the
@@ -184,7 +183,8 @@ public:
    * search.
    * @param q1 The first hardware qubit.
    * @param q2 The second hardware qubit.
-   * @param closeBy If the swap should be performed to the exact position of q2 or just to its vicinity.
+   * @param closeBy If the swap should be performed to the exact position of q2
+   * or just to its vicinity.
    * @return The swap distance between the two hardware qubits.
    */
   [[nodiscard]] inline fp getSwapDistance(HwQubit q1, HwQubit q2,
@@ -211,7 +211,6 @@ public:
    */
   [[nodiscard]] fp getSwapDistanceMove(CoordIndex idx, HwQubit target);
 
-
   /**
    * @brief Returns the nearby hardware qubits of a hardware qubit.
    * @param q The hardware qubit.
@@ -226,9 +225,10 @@ public:
    * @param q The hardware qubit.
    * @return The vector of all possible swaps for the hardware qubit.
    */
-  std::vector<Swap>    getNearbySwaps(HwQubit q);
+  std::vector<Swap> getNearbySwaps(HwQubit q) const;
   /**
-   * @brief Returns the unoccupied coordinates in the vicinity of a hardware qubit.
+   * @brief Returns the unoccupied coordinates in the vicinity of a hardware
+   * qubit.
    * @param q The hardware qubit.
    * @return The unoccupied coordinates in the vicinity of the hardware qubit.
    */
@@ -241,7 +241,8 @@ public:
    */
   std::set<CoordIndex> getNearbyFreeCoordinatesByCoord(CoordIndex idx);
   /**
-   * @brief Returns the occupied coordinates in the vicinity of a hardware qubit.
+   * @brief Returns the occupied coordinates in the vicinity of a hardware
+   * qubit.
    * @param q The hardware qubit.
    * @return The occupied coordinates in the vicinity of the hardware qubit.
    */
@@ -255,17 +256,20 @@ public:
   std::set<CoordIndex> getNearbyOccupiedCoordinatesByCoord(CoordIndex idx);
 
   /**
-   * @brief Computes the summed swap distance between all hardware qubits in a set.
+   * @brief Computes the summed swap distance between all hardware qubits in a
+   * set.
    * @param qubits The set of hardware qubits.
    * @return The summed swap distance between all hardware qubits in the set.
    */
-  fp                   getAllToAllSwapDistance(std::set<HwQubit>& qubits);
+  fp getAllToAllSwapDistance(std::set<HwQubit>& qubits);
 
   /**
    * @brief Computes the closest free coordinate in a given direction.
-   * @details Uses a breadth-first search to find the closest free coordinate in a given direction.
+   * @details Uses a breadth-first search to find the closest free coordinate in
+   * a given direction.
    * @param qubit The hardware qubit to start the search from.
-   * @param direction The direction in which the search is performed (Left/Right, Down/Up)
+   * @param direction The direction in which the search is performed
+   * (Left/Right, Down/Up)
    * @param excludedCoords Coordinates to be ignored in the search.
    * @return The closest free coordinate in the given direction.
    */
@@ -275,12 +279,11 @@ public:
 
   // Blocking
   /**
-   * @brief Computes all hardware qubits that are blocked by a set of hardware qubits.
+   * @brief Computes all hardware qubits that are blocked by a set of hardware
+   * qubits.
    * @param qubits The input hardware qubits.
    * @return The blocked hardware qubits.
    */
-  std::set<HwQubit>    getBlockedQubits(const std::set<HwQubit>& qubits);
-
-
+  std::set<HwQubit> getBlockedQubits(const std::set<HwQubit>& qubits);
 };
 } // namespace qc

@@ -60,18 +60,10 @@ protected:
   GateList frontLayerGate;
   // Gates in the front layer to be executed with move operations
   GateList frontLayerShuttling;
-  // Possible swaps for the front layer
-  std::vector<SwapOrMove> swapCloseByFront;
-  // Possible moves for the front layer
-  std::vector<std::pair<SwapOrMove, fp>> moveExactFront;
   // Gates in the lookahead layer to be executed with swap gates
   GateList lookaheadLayerGate;
   // Gates in the lookahead layer to be executed with move operations
   GateList lookaheadLayerShuttling;
-  // Possible swaps for the lookahead layer
-  std::vector<SwapOrMove> swapCloseByLookahead;
-  // Possible moves for the lookahead layer
-  std::vector<std::pair<SwapOrMove, fp>> moveExactLookahead;
   // The runtime parameters of the mapper
   MapperParameters parameters;
   // The qubits that are blocked by the last swap
@@ -84,7 +76,6 @@ protected:
   uint32_t nSwaps = 0;
   uint32_t nMoves = 0;
   // TODO check what this is used for
-  fp swapCloseByCost = 1;
 
   // The current placement of the hardware qubits onto the coordinates
   HardwareQubits hardwareQubits;
@@ -93,15 +84,51 @@ protected:
 
   bool verbose = true;
 
-  // Methods for layer creation
-  // TODO move layer management to separate class
+  // Methods for mapping
+  /**
+   * @brief Maps the gate to the mapped quantum circuit.
+   * @param op The gate to map
+   */
   void mapGate(const Operation* op);
-
+  /**
+   * @brief Maps all currently possible gates and updated until no more gates
+   * can be mapped.
+   * @param layer The layer to map all possible gates for
+   */
+  void mapAllPossibleGates(NeutralAtomLayer& layer);
+  /**
+   * @brief Returns all gates that can be executed now
+   * @param gates The gates to be checked
+   * @return All gates that can be executed now
+   */
+  GateList getExecutableGates(const GateList& gates);
+  /**
+   * @brief Checks if the given gate can be executed for the given mapping and
+   * hardware arrangement.
+   * @param opPointer The gate to check
+   * @return True if the gate can be executed, false otherwise
+   */
   bool isExecutable(const Operation* opPointer);
+
+  /**
+   * @brief Update the mapping for the given swap gate.
+   * @param swap The swap gate to update the mapping for
+   */
+  void updateMappingSwap(Swap swap);
+  /**
+   * @brief Update the mapping for the given move operation.
+   * @param move The move operation to update the mapping for
+   */
+  void updateMappingMove(AtomMove move);
+
+  // Methods for gate vs. shuttling
+  /**
+   * @brief Assigns the given gates to the gate or shuttling layers.
+   * @param frontGates The gates to be assigned to the front layers
+   * @param lookaheadGates The gates to be assigned to the lookahead layers
+   */
   void reassignGatesToLayers(const GateList& frontGates,
                              const GateList& lookaheadGates);
-
-  // Methods for estimation
   /**
    * @brief Estimates the minimal number of swap gates and time needed to
    * execute the given gate.
@@ -128,7 +155,7 @@ protected:
    */
   bool swapGateBetter(const Operation* opPointer);
 
-  // Methods for mapping
+  // Methods for swap gates mapping
   /**
    * @brief Finds the best swap gate for the front layer.
    * @details The best swap gate is the one that minimizes the cost function.
@@ -138,28 +165,20 @@ protected:
    */
   Swap findBestSwap();
   /**
-   * @brief Returns all gates that can be executed now
-   * @param gates The gates to be checked
-   * @return All gates that can be executed now
-   */
-  GateList getExecutableGates(const GateList& gates);
-  /**
    * @brief Returns all possible swap gates for the front layer.
    * @details The possible swap gates are all swaps starting from qubits in the
    * front layer.
    * @return All possible swap gates for the front layer
    */
-  std::set<Swap> getAllPossibleSwaps();
-  /**
-   * @brief Maps all currently possible gates and updated until no more gates
-   * can be mapped.
-   * @param layer The layer to map all possible gates for
-   */
-  void mapAllPossibleGates(NeutralAtomLayer& layer);
+  std::set<Swap>
+  getAllPossibleSwaps(const std::pair<Swaps, WeightedSwaps>& swapsFront) const;
+
   /**
    * @brief Returns the next best shuttling move operation for the front layer.
    * @return The next best shuttling move operation for the front layer
    */
+
+  // Methods for shuttling operations mapping
   AtomMove findBestAtomMove();
   /**
    * @brief Returns all possible move away combinations for a move from start to
@@ -181,16 +200,16 @@ protected:
   MoveCombs         getBestPossibleMoveCombinations();
   MultiQubitMovePos getBestMovePos(const CoordIndices& gateCoords);
 
-  /**
-   * @brief Update the mapping for the given swap gate.
-   * @param swap The swap gate to update the mapping for
-   */
-  void updateMappingSwap(Swap swap);
-  /**
-   * @brief Update the mapping for the given move operation.
-   * @param move The move operation to update the mapping for
-   */
-  void updateMappingMove(AtomMove move);
+  std::pair<Swaps, WeightedSwaps> initSwaps(const GateList& layer);
+
+  // Multi-qubit gate methods
+  HwQubits      getBestMultiQubitPosition(const Operation* opPointer);
+  HwQubits      getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
+                                             std::vector<HwQubit> selectedQubits,
+                                             HwQubits remainingNearbyQubits);
+  WeightedSwaps getExactSwapsToPosition(const Operation* op, HwQubits position);
+  MoveCombs     getMoveCombinationsToPosition(HwQubits&                gateQubits,
+                                              std::vector<CoordIndex>& position);
 
   // Cost function calculation
   /**
@@ -204,9 +223,8 @@ protected:
    * @param moveExact The exact moves from multi-qubit gates
    * @return The distance reduction cost
    */
-  fp swapCostPerLayer(const Swap&                                   swap,
-                      const std::vector<SwapOrMove>&                swapCloseBy,
-                      const std::vector<std::pair<SwapOrMove, fp>>& moveExact);
+  fp swapCostPerLayer(const Swap& swap, const Swaps& swapCloseBy,
+                      const WeightedSwaps& swapExact);
   /**
    * @brief Calculates the cost of a swap gate.
    * @details The cost of a swap gate is computed with the following terms:
@@ -216,7 +234,9 @@ protected:
    * @param swap The swap gate to compute the cost for
    * @return The cost of the swap gate
    */
-  fp swapCost(const Swap& swap);
+  fp swapCost(const Swap&                            swap,
+              const std::pair<Swaps, WeightedSwaps>& swapsFront,
+              const std::pair<Swaps, WeightedSwaps>& swapsLookahead);
   /**
    * @brief Calculates the cost of a move operation.
    * @details Assumes the move is executed and computes the distance reduction
@@ -252,19 +272,6 @@ protected:
    */
   fp moveCostComb(const MoveComb& moveComb);
 
-  void initSwapAndMove(const GateList&                         layer,
-                       std::vector<SwapOrMove>&                swapCloseBy,
-                       std::vector<std::pair<SwapOrMove, fp>>& moveExact);
-
-  // Multi-qubit gate methods
-  HwQubits getBestMultiQubitPosition(const Operation* opPointer);
-  HwQubits getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
-                                        std::vector<HwQubit> selectedQubits,
-                                        HwQubits remainingNearbyQubits);
-  std::vector<std::pair<SwapOrMove, fp>>
-            getExactMoveToPosition(const Operation* op, HwQubits position);
-  MoveCombs getMoveCombinationsToPosition(HwQubits&                gateQubits,
-                                          std::vector<CoordIndex>& position);
   // temp
   void printLayers();
 

@@ -37,7 +37,8 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
     throw std::runtime_error("More qubits in circuit than in architecture");
   }
 
-  this->verbose = verboseArg;
+  //  this->verbose = verboseArg;
+  this->verbose = true;
 
   //   precompute exponential decay weights
   this->decayWeights.reserve(this->arch.getNcolumns());
@@ -50,7 +51,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
     // assign gates to layers
     reassignGatesToLayers(frontLayer.getGates(), lookaheadLayer.getGates());
 
-    // first do all gate based Mapping
+    // first do all gate based mappin gates
     while (!this->frontLayerGate.empty()) {
       GateList gatesToExecute;
       while (gatesToExecute.empty()) {
@@ -69,6 +70,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
         printLayers();
       }
     }
+    // then do all shuttling based mapping gates
     while (!this->frontLayerShuttling.empty()) {
       GateList gatesToExecute;
       while (gatesToExecute.empty()) {
@@ -289,13 +291,11 @@ void NeutralAtomMapper::updateMappingMove(qc::AtomMove move) {
 
 qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   // compute necessary movements
-  initSwapAndMove(this->frontLayerGate, this->swapCloseByFront,
-                  this->moveExactFront);
-  initSwapAndMove(this->lookaheadLayerGate, this->swapCloseByLookahead,
-                  this->moveExactLookahead);
+  auto swapsFront     = initSwaps(this->frontLayerGate);
+  auto swapsLookahead = initSwaps(this->lookaheadLayerGate);
 
   // evaluate swaps based on cost function
-  auto swaps = getAllPossibleSwaps();
+  auto swaps = getAllPossibleSwaps(swapsFront);
   if (swaps.empty()) {
     return {std::numeric_limits<Qubit>::max(),
             std::numeric_limits<Qubit>::max()};
@@ -303,7 +303,7 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   std::vector<std::pair<Swap, fp>> swapCosts;
   swapCosts.reserve(swaps.size());
   for (const auto& swap : swaps) {
-    swapCosts.emplace_back(swap, swapCost(swap));
+    swapCosts.emplace_back(swap, swapCost(swap, swapsFront, swapsLookahead));
   }
   std::sort(swapCosts.begin(), swapCosts.end(),
             [](const auto& swap1, const auto& swap2) {
@@ -317,9 +317,11 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   return bestSwap->first;
 }
 
-std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
+std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps(
+    const std::pair<Swaps, WeightedSwaps>& swapsFront) const {
+  auto [swapCloseByFront, swapExactFront] = swapsFront;
   std::set<Swap> swaps;
-  for (const auto& swapNearby : this->swapCloseByFront) {
+  for (const auto& swapNearby : swapCloseByFront) {
     const auto nearbySwapsFirst =
         this->hardwareQubits.getNearbySwaps(swapNearby.first);
     for (const auto& swapFirst : nearbySwapsFirst) {
@@ -331,9 +333,9 @@ std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
       swaps.insert(swapSecond);
     }
   }
-  for (const auto& moveExact : this->moveExactFront) {
+  for (const auto& [swap, weight] : swapExactFront) {
     const auto nearbySwapsFirst =
-        this->hardwareQubits.getNearbySwaps(moveExact.first.first);
+        this->hardwareQubits.getNearbySwaps(swap.first);
     for (const auto& swapFirst : nearbySwapsFirst) {
       swaps.insert(swapFirst);
     }
@@ -341,16 +343,20 @@ std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps() {
   return swaps;
 }
 
-fp NeutralAtomMapper::swapCost(const Swap& swap) {
+fp NeutralAtomMapper::swapCost(
+    const Swap& swap, const std::pair<Swaps, WeightedSwaps>& swapsFront,
+    const std::pair<Swaps, WeightedSwaps>& swapsLookahead) {
+  auto [swapCloseByFront, swapExactFront]         = swapsFront;
+  auto [swapCloseByLookahead, swapExactLookahead] = swapsLookahead;
   // compute the change in total distance
   auto distanceChangeFront =
-      swapCostPerLayer(swap, this->swapCloseByFront, this->moveExactFront) /
+      swapCostPerLayer(swap, swapCloseByFront, swapExactFront) /
       static_cast<fp>(this->frontLayerGate.size());
   fp distanceChangeLookahead = 0;
   if (!this->lookaheadLayerGate.empty()) {
-    distanceChangeLookahead = swapCostPerLayer(swap, this->swapCloseByLookahead,
-                                               this->moveExactLookahead) /
-                              static_cast<fp>(this->lookaheadLayerGate.size());
+    distanceChangeLookahead =
+        swapCostPerLayer(swap, swapCloseByLookahead, swapExactLookahead) /
+        static_cast<fp>(this->lookaheadLayerGate.size());
   }
   auto cost = parameters.lookaheadWeightSwaps * distanceChangeLookahead +
               distanceChangeFront;
@@ -371,18 +377,19 @@ fp NeutralAtomMapper::swapCost(const Swap& swap) {
   return cost;
 }
 
-void NeutralAtomMapper::initSwapAndMove(
-    const qc::GateList& layer, std::vector<SwapOrMove>& swapCloseBy,
-    std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
-  swapCloseBy.clear();
-  moveExact.clear();
+std::pair<Swaps, WeightedSwaps>
+NeutralAtomMapper::initSwaps(const GateList& layer) {
+  Swaps         swapCloseBy = {};
+  WeightedSwaps swapExact   = {};
   // computes for each gate the necessary moves to execute it
   for (const auto& gate : layer) {
     auto usedQubits   = gate->getUsedQubits();
     auto usedHwQubits = this->mapping.getHwQubits(usedQubits);
     if (usedQubits.size() == 2) {
+      // swap close by for two qubit gates
       swapCloseBy.emplace_back(*usedHwQubits.begin(), *usedHwQubits.rbegin());
     } else {
+      // for multi-qubit gates, find the best position around the gate qubits
       auto bestPos = getBestMultiQubitPosition(gate);
       if (verbose) {
         std::cout << "bestPos: ";
@@ -391,34 +398,28 @@ void NeutralAtomMapper::initSwapAndMove(
         }
         std::cout << '\n';
       }
-      auto exactMoves = getExactMoveToPosition(gate, bestPos);
-      moveExact.insert(moveExact.end(), exactMoves.begin(), exactMoves.end());
+      // then compute the exact moves to get to the best position
+      auto exactSwapsToPos = getExactSwapsToPosition(gate, bestPos);
+      swapExact.insert(swapExact.end(), exactSwapsToPos.begin(),
+                       exactSwapsToPos.end());
     }
   }
   // sort and remove duplicates from moveExact
-  moveExact.erase(std::unique(moveExact.begin(), moveExact.end(),
-                              [](const auto& move1, const auto& move2) {
-                                return move1.first == move2.first;
+  swapExact.erase(std::unique(swapExact.begin(), swapExact.end(),
+                              [](const auto& swap1, const auto& swap2) {
+                                return swap1.first == swap2.first;
                               }),
-                  moveExact.end());
-
-  // compute minimal cost of exact moves
-  if (!moveExact.empty()) {
-    auto minCost          = std::min_element(moveExact.begin(), moveExact.end(),
-                                             [](const auto& move1, const auto& move2) {
-                                      return move1.second < move2.second;
-                                    });
-    this->swapCloseByCost = minCost->second;
-  }
+                  swapExact.end());
+  return {swapCloseBy, swapExact};
 }
 
-fp NeutralAtomMapper::swapCostPerLayer(
-    const Swap& swap, const std::vector<SwapOrMove>& swapCloseBy,
-    const std::vector<std::pair<SwapOrMove, fp>>& moveExact) {
+fp NeutralAtomMapper::swapCostPerLayer(const Swap&          swap,
+                                       const Swaps&         swapCloseBy,
+                                       const WeightedSwaps& swapExact) {
   fp distBefore = 0;
   fp distAfter  = 0;
   fp distChange = 0;
-  // bring close only ontil swap distance =0, bring exact to the exact position
+  // bring close only until swap distance =0, bring exact to the exact position
   // bring qubits together to execute gate
   for (const auto& [q1, q2] : swapCloseBy) {
     // distance before
@@ -438,14 +439,13 @@ fp NeutralAtomMapper::swapCostPerLayer(
     } else {
       continue;
     }
-    distChange += (distAfter - distBefore) * this->swapCloseByCost;
+    distChange += (distAfter - distBefore);
   }
 
   // move qubits to the exact position for multi-qubit gates
-  for (const auto& moveWithCost : moveExact) {
-    auto move        = moveWithCost.first;
-    auto origin      = move.first;
-    auto destination = move.second;
+  for (const auto& [exactSwap, weight] : swapExact) {
+    auto origin      = exactSwap.first;
+    auto destination = exactSwap.second;
     distBefore =
         this->hardwareQubits.getSwapDistance(origin, destination, false);
     if (distBefore == std::numeric_limits<fp>::infinity()) {
@@ -468,7 +468,9 @@ fp NeutralAtomMapper::swapCostPerLayer(
     } else {
       continue;
     }
-    distChange += (distAfter - distBefore);
+    // multiply by multi-qubit weight
+    // is larger for more qubits and if the qubits are closer together
+    distChange += (distAfter - distBefore) * weight;
   }
 
   return distChange;
@@ -622,15 +624,14 @@ HwQubits NeutralAtomMapper::getBestMultiQubitPositionRec(
                                       remainingNearbyQubits);
 }
 
-std::vector<std::pair<SwapOrMove, fp>>
-NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
-                                          HwQubits         position) {
+WeightedSwaps NeutralAtomMapper::getExactSwapsToPosition(const Operation* op,
+                                                         HwQubits position) {
   if (position.empty()) {
     return {};
   }
-  auto gateQubits   = op->getUsedQubits();
-  auto gateHwQubits = this->mapping.getHwQubits(gateQubits);
-  std::vector<std::pair<SwapOrMove, fp>> exactMoves;
+  auto          gateQubits   = op->getUsedQubits();
+  auto          gateHwQubits = this->mapping.getHwQubits(gateQubits);
+  WeightedSwaps swapsExact;
   while (!position.empty() && !gateHwQubits.empty()) {
     std::vector<std::tuple<HwQubit, std::set<HwQubit>, fp>> minimalDistances;
     std::set<HwQubit> minimalDistancePosQubit;
@@ -710,15 +711,15 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
                                   assignedGateQubit, qubit, false) == 1;
                      }) &&
         assignedGateQubit != assignedPosQubit) {
-      exactMoves.emplace_back(
+      swapsExact.emplace_back(
           std::make_pair(assignedGateQubit, assignedPosQubit), 0);
     }
   }
 
   // compute total distance of all moves
   fp totalDistance = 0;
-  for (const auto& [move, cost] : exactMoves) {
-    auto [q1, q2] = move;
+  for (const auto& [swap, weight] : swapsExact) {
+    auto [q1, q2] = swap;
     totalDistance += this->hardwareQubits.getSwapDistance(q1, q2, false);
   }
   // add cost to the moves -> move first qubit corresponding to almost finished
@@ -726,11 +727,11 @@ NeutralAtomMapper::getExactMoveToPosition(const Operation* op,
   auto nQubits = op->getUsedQubits().size();
   auto multiQubitFactor =
       (static_cast<fp>(nQubits) * static_cast<fp>(nQubits - 1)) / 2;
-  for (auto& move : exactMoves) {
+  for (auto& move : swapsExact) {
     move.second = multiQubitFactor / totalDistance;
   }
 
-  return exactMoves;
+  return swapsExact;
 }
 
 AtomMove NeutralAtomMapper::findBestAtomMove() {
@@ -1155,13 +1156,13 @@ NeutralAtomMapper::estimateNumSwapGates(const Operation* opPointer) {
       return {std::numeric_limits<uint32_t>::max(),
               std::numeric_limits<fp>::infinity()};
     }
-    auto exactMoves = getExactMoveToPosition(opPointer, bestPos);
-    if (exactMoves.empty()) {
+    auto exactSwaps = getExactSwapsToPosition(opPointer, bestPos);
+    if (exactSwaps.empty()) {
       return {std::numeric_limits<uint32_t>::max(),
               std::numeric_limits<fp>::infinity()};
     }
-    for (const auto& move : exactMoves) {
-      auto [q1, q2] = move.first;
+    for (const auto& [swap, weight] : exactSwaps) {
+      auto [q1, q2] = swap;
       minNumSwaps += this->hardwareQubits.getSwapDistance(q1, q2, false);
     }
   }

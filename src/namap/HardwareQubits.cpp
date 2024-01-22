@@ -106,7 +106,7 @@ void HardwareQubits::move(HwQubit hwQubit, CoordIndex newCoord) {
   resetSwapDistances();
 }
 
-std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) {
+std::vector<Swap> HardwareQubits::getNearbySwaps(qc::HwQubit q) const {
   std::vector<Swap> swaps;
   swaps.reserve(nearbyQubits.size());
   for (const auto& nearbyQubit : nearbyQubits.at(q)) {
