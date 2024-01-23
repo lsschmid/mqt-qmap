@@ -110,8 +110,8 @@ void AodScheduler::MoveGroup::add(const AtomMove& move, const uint32_t idx) {
 }
 
 void AodScheduler::AodActivationHelper::addActivation(
-    std::pair<ActivationMerge, ActivationMerge> merge, const Coordinate& origin,
-    const AtomMove& move, MoveVector v) {
+    std::pair<ActivationMergeType, ActivationMergeType> merge,
+    const Coordinate& origin, const AtomMove& move, MoveVector v) {
   const auto x         = origin.getX();
   const auto y         = origin.getY();
   const auto signX     = v.direction.getSignX();
@@ -122,19 +122,19 @@ void AodScheduler::AodActivationHelper::addActivation(
   auto       aodMovesY = getAodMovesFromInit(Dimension::Y, y);
 
   switch (merge.first) {
-  case ActivationMerge::Trivial:
+  case ActivationMergeType::Trivial:
     switch (merge.second) {
-    case ActivationMerge::Trivial:
+    case ActivationMergeType::Trivial:
       allActivations.emplace_back(
           AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
       break;
-    case ActivationMerge::Merge:
+    case ActivationMergeType::Merge:
       allActivations.emplace_back(
           AodActivation{Dimension::X, {x, deltaX, signX}, move});
       addActivationDim(Dimension::Y,
                        AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       break;
-    case ActivationMerge::Append:
+    case ActivationMergeType::Append:
       allActivations.emplace_back(
           AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
       aodMovesY = getAodMovesFromInit(Dimension::Y, y);
@@ -144,21 +144,21 @@ void AodScheduler::AodActivationHelper::addActivation(
       break;
     }
     break;
-  case ActivationMerge::Merge:
+  case ActivationMergeType::Merge:
     switch (merge.second) {
-    case ActivationMerge::Trivial:
+    case ActivationMergeType::Trivial:
       allActivations.emplace_back(
           AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       addActivationDim(Dimension::X,
                        AodActivation{Dimension::X, {x, deltaX, signX}, move});
       break;
-    case ActivationMerge::Merge:
+    case ActivationMergeType::Merge:
       addActivationDim(Dimension::X,
                        AodActivation{Dimension::X, {x, deltaX, signX}, move});
       addActivationDim(Dimension::Y,
                        AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       break;
-    case ActivationMerge::Append:
+    case ActivationMergeType::Append:
       addActivationDim(Dimension::X,
                        AodActivation{Dimension::X, {x, deltaX, signX}, move});
       allActivations.emplace_back(
@@ -170,15 +170,15 @@ void AodScheduler::AodActivationHelper::addActivation(
       break;
     }
     break;
-  case ActivationMerge::Append:
+  case ActivationMergeType::Append:
     switch (merge.second) {
-    case ActivationMerge::Trivial:
+    case ActivationMergeType::Trivial:
       allActivations.emplace_back(
           AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
       aodMovesX = getAodMovesFromInit(Dimension::X, x);
       reAssignOffsets(aodMovesX, signX);
       break;
-    case ActivationMerge::Merge:
+    case ActivationMergeType::Merge:
       allActivations.emplace_back(
           AodActivation{Dimension::X, {x, deltaX, signX}, move});
       aodMovesX = getAodMovesFromInit(Dimension::X, x);
@@ -186,7 +186,7 @@ void AodScheduler::AodActivationHelper::addActivation(
       addActivationDim(Dimension::Y,
                        AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       break;
-    case ActivationMerge::Append:
+    case ActivationMergeType::Append:
       allActivations.emplace_back(
           AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
       aodMovesX = getAodMovesFromInit(Dimension::X, x);
@@ -203,7 +203,7 @@ void AodScheduler::AodActivationHelper::addActivation(
   }
 }
 
-std::pair<ActivationMerge, ActivationMerge>
+std::pair<ActivationMergeType, ActivationMergeType>
 AodScheduler::AodActivationHelper::canAddActivation(
     const qc::Coordinate& origin, qc::MoveVector v) const {
   auto aodMovesX = getAodMovesFromInit(Dimension::X, origin.getX());
@@ -214,7 +214,7 @@ AodScheduler::AodActivationHelper::canAddActivation(
   return std::make_pair(canX, canY);
 }
 
-ActivationMerge AodScheduler::AodActivationHelper::canAddActivationDim(
+ActivationMergeType AodScheduler::AodActivationHelper::canAddActivationDim(
     Dimension dim, const Coordinate& origin, MoveVector v) const {
   auto x = dim == Dimension::X ? origin.getX() : origin.getY();
   auto sign =
@@ -223,22 +223,22 @@ ActivationMerge AodScheduler::AodActivationHelper::canAddActivationDim(
   auto aodMoves = getAodMovesFromInit(dim, x);
   if (aodMoves.empty()) {
     // return false as no merge is required
-    return ActivationMerge::Trivial;
+    return ActivationMergeType::Trivial;
   }
   // check if it can be combined with existing activations
   for (auto* aodMove : aodMoves) {
     if (aodMove->init == x && aodMove->delta == delta &&
         aodMove->offset == sign) {
       // combine activations
-      return ActivationMerge::Merge;
+      return ActivationMergeType::Merge;
     }
   }
 
   // check if increase in x direction possible
   if (checkIntermediateSpaceAtInit(dim, x, sign)) {
-    return ActivationMerge::Append;
+    return ActivationMergeType::Append;
   }
-  return ActivationMerge::Impossible;
+  return ActivationMergeType::Impossible;
 }
 
 void AodScheduler::AodActivationHelper::reAssignOffsets(
@@ -274,10 +274,10 @@ void AodScheduler::processMoveGroups() {
       auto activationCanAddXY = aodActivationHelper.canAddActivation(origin, v);
       auto deactivationCanAddXY =
           aodDeactivationHelper.canAddActivation(target, vReverse);
-      if (activationCanAddXY.first == ActivationMerge::Impossible ||
-          activationCanAddXY.second == ActivationMerge::Impossible ||
-          deactivationCanAddXY.first == ActivationMerge::Impossible ||
-          deactivationCanAddXY.second == ActivationMerge::Impossible) {
+      if (activationCanAddXY.first == ActivationMergeType::Impossible ||
+          activationCanAddXY.second == ActivationMergeType::Impossible ||
+          deactivationCanAddXY.first == ActivationMergeType::Impossible ||
+          deactivationCanAddXY.second == ActivationMergeType::Impossible) {
         // move could not be added as not sufficient intermediate levels
         // add new move group and add move to it
         possibleNewMoveGroup.add(move, idx);

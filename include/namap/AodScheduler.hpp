@@ -11,7 +11,7 @@
 
 namespace qc {
 // Possible types two Move combination can be combined to
-enum class ActivationMerge { Impossible, Trivial, Merge, Append };
+enum class ActivationMergeType { Impossible, Trivial, Merge, Append };
 
 /**
  * @brief Class to schedule AOD movements on a neutral atom architecture
@@ -37,9 +37,12 @@ protected:
      * - the size of the offset of the AOD movement
      */
     struct AodMove {
+      // start of the move
       uint32_t init;
-      fp       delta;
-      int32_t  offset;
+      // need offset move to avoid crossing
+      int32_t offset;
+      // delta of the actual move
+      fp delta;
 
       AodMove(uint32_t init, fp delta, int32_t offset)
           : init(init), delta(delta), offset(offset) {}
@@ -108,7 +111,7 @@ protected:
      * @param v The move vector of the move
      * @return A pair of ActivationMerge, in x and y direction
      */
-    std::pair<ActivationMerge, ActivationMerge>
+    std::pair<ActivationMergeType, ActivationMergeType>
     canAddActivation(const Coordinate& origin, MoveVector v) const;
     /**
      * @brief Checks if the move can be added to the current activations in the
@@ -118,8 +121,9 @@ protected:
      * @param v The move vector of the move
      * @return The ActivationMerge type
      */
-    ActivationMerge canAddActivationDim(Dimension dim, const Coordinate& origin,
-                                        MoveVector v) const;
+    ActivationMergeType canAddActivationDim(Dimension         dim,
+                                            const Coordinate& origin,
+                                            MoveVector        v) const;
     /**
      * @brief Adds the move to the current activations
      * @details The move is merged into the current activations depending on the
@@ -129,9 +133,9 @@ protected:
      * @param move The move to add
      * @param v The move vector of the move
      */
-    void addActivation(std::pair<ActivationMerge, ActivationMerge> merge,
-                       const Coordinate& origin, const AtomMove& move,
-                       MoveVector v);
+    void
+    addActivation(std::pair<ActivationMergeType, ActivationMergeType> merge,
+                  const Coordinate& origin, const AtomMove& move, MoveVector v);
     /**
      * @brief Adds an activation to the current activations
      * @param dim The dimension/direction of the activation
