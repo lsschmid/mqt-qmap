@@ -48,6 +48,24 @@ struct MultiQubitMovePos {
   }
 };
 
+/**
+ * @brief Class to map a quantum circuit to a neutral atom architecture.
+ * @details The mapping has following important parts:
+ * - initial mapping: The initial mapping of the circuit qubits to the hardware
+ * qubits.
+ * - layer creation: The creation of the front and lookahead layers, done one
+ * the fly and taking into account basic commutation rules.
+ * - estimation: The estimation of the number of swap gates and moves needed to
+ * execute a given gate and the decision which technique is better.
+ * - gate based mapping: SABRE based algorithm to choose the bast swap for the
+ * given layers.
+ * - shuttling based mapping: Computing and evaluation of possible moves and
+ * choosing best.
+ * - multi-qubit-gates: Additional steps and checks to bring multiple qubits
+ * together.
+ * -> Final circuit contains abstract SWAP gates and MOVE operations, which need
+ * to be decomposed using AODScheduler.
+ */
 class NeutralAtomMapper {
 protected:
   // The considered architecture
@@ -64,6 +82,8 @@ protected:
   GateList lookaheadLayerGate;
   // Gates in the lookahead layer to be executed with move operations
   GateList lookaheadLayerShuttling;
+  // The minimal weight for any multi-qubit gate
+  fp twoQubitSwapWeight = 1;
   // The runtime parameters of the mapper
   MapperParameters parameters;
   // The qubits that are blocked by the last swap
@@ -75,7 +95,6 @@ protected:
   // Counter variables
   uint32_t nSwaps = 0;
   uint32_t nMoves = 0;
-  // TODO check what this is used for
 
   // The current placement of the hardware qubits onto the coordinates
   HardwareQubits hardwareQubits;
@@ -179,7 +198,21 @@ protected:
    */
 
   // Methods for shuttling operations mapping
+  /**
+   * @brief Finds the current best move operation based on the cost function.
+   * @details Uses getAllMoveCombinations to find all possible move combinations
+   * (direct move, move away, multi-qubit moves) and then chooses the best one
+   * based on the cost function.
+   * @return The current best move operation
+   */
   AtomMove findBestAtomMove();
+  /**
+   * @brief Returns all possible move combinations for the front layer.
+   * @details This includes direct moves, move away and multi-qubit moves.
+   * Only move combinations with minimal number of moves are kept.
+   * @return Vector of possible move combinations for the front layer
+   */
+  MoveCombs getAllMoveCombinatinos();
   /**
    * @brief Returns all possible move away combinations for a move from start to
    * target.
@@ -192,24 +225,68 @@ protected:
    * @param excludedCoords Coordinates the qubits should not be moved to
    * @return All possible move away combinations for a move from start to target
    */
-  MoveCombs         getMoveAwayCombinations(CoordIndex start, CoordIndex target,
-                                            const CoordIndices& excludedCoords);
+  MoveCombs getMoveAwayCombinations(CoordIndex start, CoordIndex target,
+                                    const CoordIndices& excludedCoords);
+
+  // Helper methods
+  /**
+   * @brief Distinguishes between two-qubit swaps and multi-qubit swaps.
+   * @details Two-qubit swaps only need to swap next to each other, while
+   * multi-qubit swaps need to swap exactly to the multi-qubit gate position.
+   * The multi-qubit swaps are weighted depending on their importance to finish
+   * the multi-qubit gate.
+   * @param layer The layer to distinguish the swaps for (front or lookahead)
+   * @return The two-qubit swaps and multi-qubit swaps for the given layer
+   */
+  std::pair<Swaps, WeightedSwaps> initSwaps(const GateList& layer);
+  /**
+   * @brief Helperfunction to set the two-qubit swap weight to the minimal
+   * weight of all multi-qubit gates, or 1.
+   * @param swapExact The exact moves from multi-qubit gates
+   */
+  void setTwoQubitSwapWeight(const WeightedSwaps& swapExact);
+
+  /**
+   * @brief Returns the best position for the given gate coordinates.
+   * @details Recursively calls getMovePositionRec
+   * @param gateCoords The coordinates of the gate to find the best position for
+   * @return The best position for the given gate coordinates
+   */
+  CoordIndices      getBestMovePos(const CoordIndices& gateCoords);
   MultiQubitMovePos getMovePositionRec(MultiQubitMovePos   currentPos,
                                        const CoordIndices& gateCoords,
                                        const size_t&       maxNMoves);
-  MoveCombs         getBestPossibleMoveCombinations();
-  MultiQubitMovePos getBestMovePos(const CoordIndices& gateCoords);
+  /**
+   * @brief Returns possible move combinations to move the gate qubits to the
+   * given position.
+   * @param gateQubits The gate qubit to be moved
+   * @param position The target position of the gate qubits
+   * @return Possible move combinations to move the gate qubits to the given
+   * position
+   */
+  MoveCombs getMoveCombinationsToPosition(HwQubits&     gateQubits,
+                                          CoordIndices& position);
 
-  std::pair<Swaps, WeightedSwaps> initSwaps(const GateList& layer);
-
-  // Multi-qubit gate methods
-  HwQubits      getBestMultiQubitPosition(const Operation* opPointer);
-  HwQubits      getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
-                                             std::vector<HwQubit> selectedQubits,
-                                             HwQubits remainingNearbyQubits);
+  // Multi-qubit gate based methods
+  /**
+   * @brief Returns the best position for the given multi-qubit gate.
+   * @details Calls getBestMultiQubitPositionRec to find the best position by
+   * performing a recursive search in a breadth-first manner.
+   * @param opPointer The multi-qubit gate to find the best position for
+   * @return The best position for the given multi-qubit gate
+   */
+  HwQubits getBestMultiQubitPosition(const Operation* opPointer);
+  HwQubits getBestMultiQubitPositionRec(HwQubits remainingGateQubits,
+                                        std::vector<HwQubit> selectedQubits,
+                                        HwQubits remainingNearbyQubits);
+  /**
+   * @brief Returns the swaps needed to move the given qubits to the given
+   * multi-qubit gate position.
+   * @param op The multi-qubit gate to find the best position for
+   * @param position The target position of the multi-qubit gate
+   * @return The swaps needed to move the given qubits to the given multi-qubit
+   */
   WeightedSwaps getExactSwapsToPosition(const Operation* op, HwQubits position);
-  MoveCombs     getMoveCombinationsToPosition(HwQubits&                gateQubits,
-                                              std::vector<CoordIndex>& position);
 
   // Cost function calculation
   /**

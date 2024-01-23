@@ -37,8 +37,7 @@ QuantumComputation qc::NeutralAtomMapper::map(qc::QuantumComputation& qc,
     throw std::runtime_error("More qubits in circuit than in architecture");
   }
 
-  //  this->verbose = verboseArg;
-  this->verbose = true;
+  this->verbose = verboseArg;
 
   //   precompute exponential decay weights
   this->decayWeights.reserve(this->arch.getNcolumns());
@@ -293,6 +292,7 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
   // compute necessary movements
   auto swapsFront     = initSwaps(this->frontLayerGate);
   auto swapsLookahead = initSwaps(this->lookaheadLayerGate);
+  setTwoQubitSwapWeight(swapsFront.second);
 
   // evaluate swaps based on cost function
   auto swaps = getAllPossibleSwaps(swapsFront);
@@ -315,6 +315,14 @@ qc::Swap qc::NeutralAtomMapper::findBestSwap() {
                                      return swap1.second < swap2.second;
                                    });
   return bestSwap->first;
+}
+
+void NeutralAtomMapper::setTwoQubitSwapWeight(const WeightedSwaps& swapExact) {
+  for (auto& [swap, weight] : swapExact) {
+    if (weight < this->twoQubitSwapWeight) {
+      this->twoQubitSwapWeight = weight;
+    }
+  }
 }
 
 std::set<qc::Swap> qc::NeutralAtomMapper::getAllPossibleSwaps(
@@ -439,7 +447,7 @@ fp NeutralAtomMapper::swapCostPerLayer(const Swap&          swap,
     } else {
       continue;
     }
-    distChange += (distAfter - distBefore);
+    distChange += (distAfter - distBefore) * this->twoQubitSwapWeight;
   }
 
   // move qubits to the exact position for multi-qubit gates
@@ -735,8 +743,9 @@ WeightedSwaps NeutralAtomMapper::getExactSwapsToPosition(const Operation* op,
 }
 
 AtomMove NeutralAtomMapper::findBestAtomMove() {
-  auto moveCombs = getBestPossibleMoveCombinations();
+  auto moveCombs = getAllMoveCombinatinos();
 
+  // compute cost for each move combination
   std::vector<std::pair<MoveComb, fp>> moveCosts;
   moveCosts.reserve(moveCombs.size());
   for (const auto& moveComb : moveCombs) {
@@ -972,7 +981,7 @@ NeutralAtomMapper::getMovePositionRec(MultiQubitMovePos   currentPos,
   return {};
 }
 
-MoveCombs NeutralAtomMapper::getBestPossibleMoveCombinations() {
+MoveCombs NeutralAtomMapper::getAllMoveCombinatinos() {
   MoveCombs allMoves;
   for (const auto& op : this->frontLayerShuttling) {
     auto usedQubits    = op->getUsedQubits();
@@ -981,15 +990,14 @@ MoveCombs NeutralAtomMapper::getBestPossibleMoveCombinations() {
     auto usedCoords =
         std::vector<CoordIndex>(usedCoordsSet.begin(), usedCoordsSet.end());
     auto bestPos = getBestMovePos(usedCoords);
-    auto moves   = getMoveCombinationsToPosition(usedHwQubits, bestPos.coords);
+    auto moves   = getMoveCombinationsToPosition(usedHwQubits, bestPos);
     allMoves.addMoveCombs(moves);
   }
   allMoves.removeLongerMoveCombs();
   return allMoves;
 }
 
-MultiQubitMovePos
-NeutralAtomMapper::getBestMovePos(const CoordIndices& gateCoords) {
+CoordIndices NeutralAtomMapper::getBestMovePos(const CoordIndices& gateCoords) {
   size_t const maxMoves   = gateCoords.size() * 2;
   size_t const minMoves   = gateCoords.size();
   size_t       nMovesGate = maxMoves;
@@ -1024,7 +1032,7 @@ NeutralAtomMapper::getBestMovePos(const CoordIndices& gateCoords) {
     auto bestPos = getMovePositionRec(currentPos, gateCoords, nMovesGate);
     finalBestPos = bestPos;
     if (!bestPos.coords.empty() && bestPos.nMoves <= minMoves) {
-      return bestPos;
+      return bestPos.coords;
     }
 
     // min not yet reached, check nearby
@@ -1040,11 +1048,12 @@ NeutralAtomMapper::getBestMovePos(const CoordIndices& gateCoords) {
   }
   throw QFRException(
       "No move position found (check if enough free coords are available)");
-  return finalBestPos;
+  return finalBestPos.coords;
 }
 
-MoveCombs NeutralAtomMapper::getMoveCombinationsToPosition(
-    qc::HwQubits& gateQubits, std::vector<CoordIndex>& position) {
+MoveCombs
+NeutralAtomMapper::getMoveCombinationsToPosition(HwQubits&     gateQubits,
+                                                 CoordIndices& position) {
   if (position.empty()) {
     throw QFRException("No position given");
   }
