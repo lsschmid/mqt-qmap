@@ -105,10 +105,12 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
 
     totalGateFidelities *= opFidelity;
     totalGateTime += opTime;
+    /*
     if (verbose) {
       std::cout << "\n";
       printTotalExecutionTimes(totalExecutionTimes, blockedQubitsTimes);
     }
+    */
   }
   //  if (verbose) {
   std::cout << "\n* schedule end!\n";

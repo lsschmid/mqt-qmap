@@ -44,6 +44,8 @@ int main(int argc, char* argv[]) {
   qc::InitialCoordinateMapping initialCoordinateMappingEnum;
   if (initialCoordinateMapping == "trivial") {
     initialCoordinateMappingEnum = qc::InitialCoordinateMapping::Trivial;
+  } else if (initialCoordinateMapping == "graph") {
+    initialCoordinateMappingEnum = qc::InitialCoordinateMapping::Graph;
   } else if (initialCoordinateMapping == "random") {
     initialCoordinateMappingEnum = qc::InitialCoordinateMapping::Random;
   } else {
@@ -80,7 +82,7 @@ int main(int argc, char* argv[]) {
     // start mapping
     auto startTime = std::chrono::high_resolution_clock::now();
     qc::NeutralAtomMapper mapper =
-        qc::NeutralAtomMapper(arch, initialCoordinateMappingEnum);
+        qc::NeutralAtomMapper(arch); //////////////////////////////////////////////////////
     qc::MapperParameters mapperParameters;
     mapperParameters.lookaheadWeightSwaps = lookaheadGate;
     mapperParameters.lookaheadWeightMoves = lookaheadShuttling;
@@ -92,7 +94,7 @@ int main(int argc, char* argv[]) {
 
     std::cout << "Mapping " << qasmFile << "\n";
     qc::QuantumComputation qc = qc::QuantumComputation(qasmFile);
-    auto          qcMapped = mapper.map(qc, initialCircuitMappingEnum, verbose);
+    auto          qcMapped = mapper.map(qc, initialCircuitMappingEnum, initialCoordinateMappingEnum, verbose); ////////////////////
     std::ofstream ofs(output_directory + "/" +
                       std::filesystem::path(qasmFile).filename().string() +
                       "_" + std::to_string(runIdx) + ".qasm_ext");

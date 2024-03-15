@@ -94,6 +94,7 @@ protected:
   std::vector<fp> decayWeights;
   // Counter variables
   uint32_t nSwaps = 0;
+  uint32_t nBridges  = 0;
   uint32_t nMoves = 0;
 
   // The current placement of the hardware qubits onto the coordinates
@@ -134,6 +135,10 @@ protected:
    * @param swap The swap gate to update the mapping for
    */
   void updateMappingSwap(Swap swap);
+  
+  void updateMappingBridge( std::vector<std::pair<const Operation*, Bridge>> ExecutableBridges, 
+                            qc::NeutralAtomLayer& frontLayer, qc::NeutralAtomLayer& lookaheadLayer); 
+  /////////////////////////
   /**
    * @brief Update the mapping for the given move operation.
    * @param move The move operation to update the mapping for
@@ -191,6 +196,14 @@ protected:
    */
   std::set<Swap>
   getAllPossibleSwaps(const std::pair<Swaps, WeightedSwaps>& swapsFront) const;
+
+  //////////////////////////////////////////////////////////////
+  std::vector<std::pair<const Operation*, Bridge>> findAllBridges(qc::QuantumComputation& qc);
+  std::vector<std::pair<const Operation*, Bridge>> bridgeCost( 
+            std::vector<std::pair<const Operation*, Bridge>> allBridges, const DAG& dag, NeutralAtomLayer& frontLayer);
+  std::vector<std::pair<const Operation*, Bridge>> bridgeCostCompareWithSwap( 
+            std::vector<std::pair<const Operation*, Bridge>> allBridges, Swap bestSwap, const DAG& dag, NeutralAtomLayer& frontLayer);
+  //////////////////////////////////////////////////////////////
 
   /**
    * @brief Returns the next best shuttling move operation for the front layer.
@@ -354,10 +367,11 @@ protected:
 
 public:
   // Constructors
-  NeutralAtomMapper(const qc::NeutralAtomArchitecture& arch,
-                    InitialCoordinateMapping           initialCoordinateMapping)
-      : arch(arch), mappedQc(arch.getNpositions()),
-        hardwareQubits(arch, initialCoordinateMapping){};
+  NeutralAtomMapper(const qc::NeutralAtomArchitecture& arch) //,
+                    //InitialCoordinateMapping           initialCoordinateMapping)
+      : arch(arch), mappedQc(arch.getNpositions()), 
+        //hardwareQubits(arch, initialCoordinateMapping){};
+        hardwareQubits(arch){}; /////////
 
   /**
    * @brief Sets the runtime parameters of the mapper.
@@ -392,7 +406,8 @@ public:
    * operations
    */
   QuantumComputation map(qc::QuantumComputation& qc,
-                         InitialMapping initialMapping, bool verbose = true);
+                         InitialMapping initialMapping, InitialCoordinateMapping initialCoordinateMapping, bool verbose = true);
+                         //InitialMapping initialMapping, bool verbose = true);
 
   /**
    * @brief Converts a mapped circuit down to the AOD level and CZ level.

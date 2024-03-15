@@ -27,6 +27,11 @@ using Swap          = std::pair<HwQubit, HwQubit>;
 using Swaps         = std::vector<Swap>;
 using WeightedSwap  = std::pair<Swap, fp>;
 using WeightedSwaps = std::vector<WeightedSwap>;
+
+// Bridges
+using Bridge        = std::tuple<Qubit, Qubit, Qubits>; //q_control, q_target, Q_between
+using Bridges       = std::vector<Bridge>;
+
 // Moves are between coordinates (the first is occupied, the second is not).
 using AtomMove = std::pair<CoordIndex, CoordIndex>;
 

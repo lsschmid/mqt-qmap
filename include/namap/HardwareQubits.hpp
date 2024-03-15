@@ -11,6 +11,7 @@
 #include "namap/NeutralAtomUtils.hpp"
 #include "random"
 
+
 namespace qc {
 
 /**
@@ -65,12 +66,19 @@ protected:
    * @details Used after each shuttling operation to reset the swap distances.
    */
   void resetSwapDistances();
+      
+  void initializeFromGraph(const NeutralAtomArchitecture& arch, const DAG& dag);
+
+
 
 public:
   // Constructors
   HardwareQubits() = delete;
+  HardwareQubits(const NeutralAtomArchitecture& arch)
+      : arch(arch), swapDistances(arch.getNqubits()) {}
   HardwareQubits(const NeutralAtomArchitecture& arch,
-                 InitialCoordinateMapping&      initialCoordinateMapping)
+                 InitialCoordinateMapping&      initialCoordinateMapping,
+                 const DAG& dag)
       : arch(arch), swapDistances(arch.getNqubits()) {
     switch (initialCoordinateMapping) {
     case Trivial:
@@ -79,6 +87,12 @@ public:
       }
       initTrivialSwapDistances();
       break;
+    // -----------------------------------------------------------------------------------
+    case Graph: {
+      initializeFromGraph(arch, dag);
+      break;
+    }
+    // -----------------------------------------------------------------------------------
     case Random:
       std::vector<CoordIndex> indices(arch.getNpositions());
       std::iota(indices.begin(), indices.end(), 0);

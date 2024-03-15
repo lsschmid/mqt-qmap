@@ -1,0 +1,10 @@
+lookaheadGate: 0.1
+lookaheadShuttling: 0.1
+gateDecay: 0
+shuttlingTimeWeight: 0.1
+gateWeight: 1
+shuttlingWeight: 1
+verbose: 0
+json_config_file_path: architectures/rubidium_shuttling.json
+initialCoordinateMapping: trivial
+initialCircuitMapping: identity

@@ -54,7 +54,7 @@ public:
 };
 
 // Enums for the different initial mappings strategies
-enum InitialCoordinateMapping { Trivial, Random };
+enum InitialCoordinateMapping { Trivial, Graph, Random};
 enum InitialMapping { Identity };
 
 /**
