@@ -441,7 +441,11 @@ AodScheduler::AodActivationHelper::getAodOperation(
   std::vector<CoordIndex> qubitsActivation;
   qubitsActivation.reserve(activation.moves.size());
   for (const auto& move : activation.moves) {
-    qubitsActivation.push_back(move.first);
+    if (type == OpType::AodActivate) {
+      qubitsActivation.push_back(move.first);
+    } else {
+      qubitsActivation.push_back(move.second);
+    }
   }
   std::vector<CoordIndex> qubitsMove;
   qubitsMove.reserve(activation.moves.size() * 2);
@@ -467,19 +471,35 @@ AodScheduler::AodActivationHelper::getAodOperation(
     initOperations.emplace_back(Dimension::X,
                                 static_cast<fp>(aodMove->init) * d,
                                 static_cast<fp>(aodMove->init) * d);
-    offsetOperations.emplace_back(
-        Dimension::X, static_cast<fp>(aodMove->init) * d,
-        static_cast<fp>(aodMove->init) * d +
-            static_cast<fp>(aodMove->offset) * interD);
+    if (type == OpType::AodActivate) {
+      offsetOperations.emplace_back(
+          Dimension::X, static_cast<fp>(aodMove->init) * d,
+          static_cast<fp>(aodMove->init) * d +
+              static_cast<fp>(aodMove->offset) * interD);
+    } else {
+      offsetOperations.emplace_back(Dimension::X,
+                                    static_cast<fp>(aodMove->init) * d +
+                                        static_cast<fp>(aodMove->offset) *
+                                            interD,
+                                    static_cast<fp>(aodMove->init) * d);
+    }
   }
   for (const auto& aodMove : activation.activateYs) {
     initOperations.emplace_back(Dimension::Y,
                                 static_cast<fp>(aodMove->init) * d,
                                 static_cast<fp>(aodMove->init) * d);
-    offsetOperations.emplace_back(
-        Dimension::Y, static_cast<fp>(aodMove->init) * d,
-        static_cast<fp>(aodMove->init) * d +
-            static_cast<fp>(aodMove->offset) * interD);
+    if (type == OpType::AodActivate) {
+      offsetOperations.emplace_back(
+          Dimension::Y, static_cast<fp>(aodMove->init) * d,
+          static_cast<fp>(aodMove->init) * d +
+              static_cast<fp>(aodMove->offset) * interD);
+    } else {
+      offsetOperations.emplace_back(Dimension::Y,
+                                    static_cast<fp>(aodMove->init) * d +
+                                        static_cast<fp>(aodMove->offset) *
+                                            interD,
+                                    static_cast<fp>(aodMove->init) * d);
+    }
   }
 
   auto initOp   = AodOperation(type, qubitsActivation, initOperations);
