@@ -404,6 +404,10 @@ public:
    * @return The mapped quantum circuit with native AOD operations
    */
   QuantumComputation convertToAod(qc::QuantumComputation& qc);
+
+  [[maybe_unused]] Permutation getInitHwPos() const {
+    return hardwareQubits.getInitialHwPos();
+  }
 };
 
 } // namespace qc

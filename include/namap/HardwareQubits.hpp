@@ -27,6 +27,7 @@ protected:
   Permutation                 hwToCoordIdx;
   SymmetricMatrix             swapDistances;
   std::map<HwQubit, HwQubits> nearbyQubits;
+  Permutation                 initialHwPos;
 
   /**
    * @brief Initializes the swap distances between the hardware qubits for the
@@ -92,6 +93,7 @@ public:
       swapDistances = SymmetricMatrix(arch.getNqubits(), -1);
     }
     initNearbyQubits();
+    initialHwPos = hwToCoordIdx;
   }
 
   // Mapping
@@ -285,5 +287,7 @@ public:
    * @return The blocked hardware qubits.
    */
   std::set<HwQubit> getBlockedQubits(const std::set<HwQubit>& qubits);
+
+  Permutation getInitialHwPos() const { return initialHwPos; }
 };
 } // namespace qc
