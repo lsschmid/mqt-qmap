@@ -333,9 +333,9 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
             // found corresponding final operation
             // connect with aod move
             const auto startXs = opInit.getEnds(Dimension::X);
-            const auto endXs   = opFinal.getEnds(Dimension::X);
+            const auto endXs   = opFinal.getStarts(Dimension::X);
             const auto startYs = opInit.getEnds(Dimension::Y);
-            const auto endYs   = opFinal.getEnds(Dimension::Y);
+            const auto endYs   = opFinal.getStarts(Dimension::Y);
             if (!startXs.empty() && !endXs.empty()) {
               const auto startX = startXs[0];
               const auto endX   = endXs[0];
