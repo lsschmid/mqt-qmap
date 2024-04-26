@@ -76,14 +76,21 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
         blocked = false;
         for (const auto& qubit : blockedQubits) {
           // check if qubit is blocked at maxTime
-          if (!blockedQubitsTimes[qubit].empty() &&
-              blockedQubitsTimes[qubit].front().first < maxTime &&
-              blockedQubitsTimes[qubit].front().second > maxTime) {
-            blocked = true;
-            // update maxTime to the end of the blocking
-            maxTime = blockedQubitsTimes[qubit].front().second;
-            // remove the blocking
-            break;
+          for (const auto& startEnd : blockedQubitsTimes[qubit]) {
+            auto start = startEnd.first;
+            auto end   = startEnd.second;
+            if (start <= maxTime && end > maxTime ||
+                (start <= maxTime + opTime && end > maxTime + opTime)) {
+              blocked = true;
+              // update maxTime to the end of the blocking
+              maxTime = end;
+              // remove the blocking
+              break;
+            }
+            // skip rest of the times
+            if (end > maxTime) {
+              break;
+            }
           }
         }
       }
