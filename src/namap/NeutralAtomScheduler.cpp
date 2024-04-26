@@ -6,11 +6,11 @@
 
 #include "CircuitOptimizer.hpp"
 
-qc::SchedulerResults
-qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
-  // decompose CX gates
-  qc::CircuitOptimizer::replaceMCXWithMCZ(qc);
+#include <string>
 
+qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
+    const qc::QuantumComputation& qc, const Permutation& initHwPos,
+    bool verbose, bool createAnimationCsv, fp shuttlingSpeedFactor) {
   if (verbose) {
     std::cout << "\n* schedule start!\n";
   }
@@ -21,6 +21,12 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       arch.getNpositions(), std::deque<std::pair<fp, fp>>());
   fp totalGateTime       = 0;
   fp totalGateFidelities = 1;
+
+  AnimationAtoms animationAtoms(initHwPos, arch);
+  if (createAnimationCsv) {
+    animationCsv += animationAtoms.getInitString();
+    animationArchitectureCsv = arch.getAnimationCsv();
+  }
 
   int      index        = 0;
   int      nAodActivate = 0;
@@ -36,8 +42,12 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       nCZs++;
     }
 
-    auto qubits     = op->getUsedQubits();
-    auto opTime     = arch.getOpTime(op.get());
+    auto qubits = op->getUsedQubits();
+    auto opTime = arch.getOpTime(op.get());
+    if (op->getType() == qc::AodMove || op->getType() == qc::AodActivate ||
+        op->getType() == qc::AodDeactivate) {
+      opTime *= shuttlingSpeedFactor;
+    }
     auto opFidelity = arch.getOpFidelity(op.get());
 
     // DEBUG info
@@ -109,6 +119,12 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       std::cout << "\n";
       printTotalExecutionTimes(totalExecutionTimes, blockedQubitsTimes);
     }
+
+    // update animation
+    if (createAnimationCsv) {
+      animationCsv +=
+          animationAtoms.createCsvOp(op, maxTime, maxTime + opTime, arch);
+    }
   }
   //  if (verbose) {
   std::cout << "\n* schedule end!\n";
@@ -125,6 +141,9 @@ qc::NeutralAtomScheduler::schedule(qc::QuantumComputation& qc, bool verbose) {
       totalGateFidelities *
       std::exp(-totalIdleTime / arch.getDecoherenceTime());
 
+  if (createAnimationCsv) {
+    animationCsv += animationAtoms.getEndString(maxExecutionTime);
+  }
   printSchedulerResults(totalExecutionTimes, totalIdleTime, totalGateFidelities,
                         totalFidelities, nCZs);
 
@@ -156,4 +175,177 @@ void qc::NeutralAtomScheduler::printTotalExecutionTimes(
     }
     std::cout << "\n";
   }
+}
+qc::AnimationAtoms::AnimationAtoms(const qc::Permutation&             initHwPos,
+                                   const qc::NeutralAtomArchitecture& arch) {
+  auto nRows = arch.getNrows();
+  auto nCols = arch.getNcolumns();
+
+  for (const auto& [id, coord] : initHwPos) {
+    coordIdxToId[coord] = id;
+    idToCoord[id]       = {coord % nCols * arch.getInterQubitDistance(),
+                           coord / nCols * arch.getInterQubitDistance()};
+  }
+}
+
+std::string qc::AnimationAtoms::getInitString() {
+  std::string initString;
+  initString +=
+      "time;id;x;y;size;fill;color;axes;axesId;margin;marginId;marginSize\n";
+  for (const auto& [id, coord] : idToCoord) {
+    initString += "0.000;" + std::to_string(id) + ";" +
+                  std::to_string(coord.first) + ";" +
+                  std::to_string(coord.second) + ";1;0;0;0;0;0;0;0\n";
+  }
+  return initString;
+}
+
+std::string qc::AnimationAtoms::getEndString(fp endTime) {
+  std::string initString;
+  for (const auto& [id, coord] : idToCoord) {
+    initString += std::to_string(endTime) + ";" + std::to_string(id) + ";" +
+                  std::to_string(coord.first) + ";" +
+                  std::to_string(coord.second) + ";1;0;0;0;0;0;0;0\n";
+  }
+  return initString;
+}
+
+void qc::AnimationAtoms::moveAtom(const qc::HwQubit id, qc::fp x, qc::fp y) {
+  auto coord = idToCoord[id];
+  coord.first += x;
+  coord.second += y;
+  idToCoord[id] = coord;
+}
+void qc::AnimationAtoms::changeCoordIdx(const qc::HwQubit    id,
+                                        const qc::CoordIndex coordIdx) {
+  coordIdxToId.erase(coordIdxToId.find(coordIdx));
+  coordIdxToId[coordIdx] = id;
+}
+qc::AnimationAtoms::axesId qc::AnimationAtoms::addAxis(qc::HwQubit id) {
+  if (axesIds.find(id) == axesIds.end()) {
+    axesIdCounter++;
+    axesIds[id] = axesIdCounter;
+  } else {
+    throw std::runtime_error(
+        "Tried to add axis but axis already exists for qubit " +
+        std::to_string(id));
+  }
+  return axesIds[id];
+}
+qc::AnimationAtoms::marginId qc::AnimationAtoms::addMargin(qc::HwQubit id) {
+  if (marginIds.find(id) == marginIds.end()) {
+    marginIdCounter++;
+    marginIds[id] = marginIdCounter;
+  } else {
+    throw std::runtime_error(
+        "Tried to add margin but margin already exists for qubit " +
+        std::to_string(id));
+  }
+  return marginIds[id];
+}
+
+std::string
+qc::AnimationAtoms::createCsvOp(const std::unique_ptr<qc::Operation>& op,
+                                fp startTime, fp endTime,
+                                const qc::NeutralAtomArchitecture& arch) {
+  std::string csvLine;
+  uint32_t    qubitIdx = 0;
+
+  for (const auto& coordIdx : op->getUsedQubits()) {
+    if (coordIdxToId.find(coordIdx) == coordIdxToId.end()) {
+      // check if qubit was moved to coordIdx, if yes, update coordIdxToId
+      if (op->getType() == OpType::AodDeactivate) {
+        for (const auto& [id, coord] : idToCoord) {
+          if (std::abs(coord.first - coordIdx % arch.getNcolumns() *
+                                         arch.getInterQubitDistance()) <
+                  0.0001 &&
+              std::abs(coord.second - coordIdx / arch.getNcolumns() *
+                                          arch.getInterQubitDistance()) <
+                  0.0001) {
+            coordIdxToId.erase(coordIdxToId.find(id));
+            coordIdxToId[coordIdx] = id;
+            break;
+          }
+        }
+      } else {
+        continue;
+      }
+    }
+    auto id    = coordIdxToId.at(coordIdx);
+    auto coord = idToCoord.at(id);
+    if (op->getType() == OpType::AodActivate) {
+      addAxis(id);
+      csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
+                               ColorSlm, true, axesIds.at(id));
+      csvLine += createCsvLine(endTime, id, coord.first, coord.second, 1,
+                               ColorAod, true, axesIds.at(id));
+    } else if (op->getType() == OpType::AodDeactivate) {
+      csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
+                               ColorAod, true, axesIds.at(id));
+      csvLine += createCsvLine(endTime, id, coord.first, coord.second, 1,
+                               ColorSlm, true, axesIds.at(id));
+      removeAxis(id);
+
+    } else if (op->getType() == OpType::AodMove) {
+      csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
+                               ColorAod, true, axesIds.at(id));
+
+      // update atom coordinates
+      auto startsX =
+          dynamic_cast<AodOperation*>(op.get())->getStarts(Dimension::X);
+      auto endsX = dynamic_cast<AodOperation*>(op.get())->getEnds(Dimension::X);
+      auto startsY =
+          dynamic_cast<AodOperation*>(op.get())->getStarts(Dimension::Y);
+      auto endsY = dynamic_cast<AodOperation*>(op.get())->getEnds(Dimension::Y);
+      for (size_t i = 0; i < startsX.size(); i++) {
+        if (std::abs(startsX[i] - coord.first) < 0.0001) {
+          coord.first = endsX[i];
+        }
+      }
+      for (size_t i = 0; i < startsY.size(); i++) {
+        if (std::abs(startsY[i] - coord.second) < 0.0001) {
+          coord.second = endsY[i];
+        }
+      }
+      // save new coordinates
+      idToCoord[id] = coord;
+      csvLine += createCsvLine(endTime, id, coord.first, coord.second, 1,
+                               ColorAod, true, axesIds.at(id));
+    } else if (op->getUsedQubits().size() > 1) { // multi qubit gates
+      addMargin(id);
+      csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
+                               ColorSlm, false, 0, false, marginIds.at(id));
+      auto midTime = (startTime + endTime) / 2;
+      csvLine += createCsvLine(midTime, id, coord.first, coord.second, 1,
+                               ColorCz, false, 0, true, marginIds.at(id),
+                               arch.getBlockingFactor() *
+                                   arch.getInterQubitDistance());
+      csvLine += createCsvLine(endTime, id, coord.first, coord.second, 1,
+                               ColorSlm, false, 0, false, marginIds.at(id));
+      removeMargin(id);
+
+    } else { // single qubit gates
+      csvLine +=
+          createCsvLine(startTime, id, coord.first, coord.second, 1, ColorSlm);
+      auto midTime = (startTime + endTime) / 2;
+      csvLine +=
+          createCsvLine(midTime, id, coord.first, coord.second, 1, ColorLocal);
+      csvLine +=
+          createCsvLine(endTime, id, coord.first, coord.second, 1, ColorSlm);
+    }
+  }
+  return csvLine;
+}
+std::string qc::AnimationAtoms::createCsvLine(
+    qc::fp startTime, qc::HwQubit id, qc::fp x, qc::fp y, uint32_t size,
+    uint32_t color, bool axes, qc::AnimationAtoms::axesId axId, bool margin,
+    qc::AnimationAtoms::marginId marginId, fp marginSize) {
+  std::string csvLine;
+  csvLine += std::to_string(startTime) + ";" + std::to_string(id) + ";" +
+             std::to_string(x) + ";" + std::to_string(y) + ";" +
+             std::to_string(size) + ";" + std::to_string(color) + ";" +
+             std::to_string(color) + ";" + std::to_string(axes) + ";" +
+             std::to_string(axId) + ";" + std::to_string(margin) + ";" +
+             std::to_string(marginId) + ";" + std::to_string(marginSize) + "\n";
+  return csvLine;
 }
