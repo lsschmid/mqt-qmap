@@ -104,7 +104,7 @@ class NeutralAtomArchitecture {
    * - shuttling average fidelities
    * - decoherence times
    * The parameters are loaded from a JSON file.
-   * The differece to the properties is that the parameters can change
+   * The difference to the properties is that the parameters can change
    * from run to run.
    */
   struct Parameters {
@@ -185,7 +185,6 @@ public:
    * @param filename The name of the JSON file
    */
   void loadJson(const std::string& filename);
-
 
   // Getters
   /**
@@ -283,7 +282,7 @@ public:
     return properties.getNAodIntermediateLevels();
   }
   /**
-   * @brief Get the executiong time of an operation
+   * @brief Get the execution time of an operation
    * @param op The operation
    * @return The execution time of the operation
    */
@@ -379,10 +378,10 @@ public:
 
   // Distance functions
   /**
-   * @brief Get the Euclidian distance between two coordinate indices
+   * @brief Get the Euclidean distance between two coordinate indices
    * @param idx1 The index of the first coordinate
    * @param idx2 The index of the second coordinate
-   * @return The Euclidian distance between the two coordinate indices
+   * @return The Euclidean distance between the two coordinate indices
    */
   [[nodiscard]] inline fp getEuclidianDistance(CoordIndex idx1,
                                                CoordIndex idx2) const {
@@ -390,10 +389,10 @@ public:
         this->coordinates.at(idx2));
   }
   /**
-   * @brief Get the Euclidian distance between two coordinates
+   * @brief Get the Euclidean distance between two coordinates
    * @param c1 The first coordinate
    * @param c2 The second coordinate
-   * @return The Euclidian distance between the two coordinates
+   * @return The Euclidean distance between the two coordinates
    */
   [[nodiscard]] inline static fp getEuclidianDistance(const Coordinate& c1,
                                                       const Coordinate& c2) {
@@ -460,6 +459,17 @@ public:
   [[nodiscard]] inline fp getVectorShuttlingTime(const MoveVector& v) const {
     return v.getLength() * this->getInterQubitDistance() /
            this->getShuttlingTime(OpType::Move);
+  }
+
+  std::string getAnimationCsv() const {
+    std::string csv = "x;y;size;color\n";
+    for (auto i = 0; i < getNcolumns(); i++) {
+      for (auto j = 0; j < getNrows(); j++) {
+        csv += std::to_string(i * getInterQubitDistance()) + ";" +
+               std::to_string(j * getInterQubitDistance()) + ";1;2\n";
+      }
+    }
+    return csv;
   }
 };
 
