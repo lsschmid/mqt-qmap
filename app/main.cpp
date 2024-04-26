@@ -78,7 +78,7 @@ int main(int argc, char* argv[]) {
     qc::NeutralAtomArchitecture arch =
         qc::NeutralAtomArchitecture(json_config_file_path);
     // start mapping
-    auto startTime = std::chrono::high_resolution_clock::now();
+    auto                  startTime = std::chrono::high_resolution_clock::now();
     qc::NeutralAtomMapper mapper =
         qc::NeutralAtomMapper(arch, initialCoordinateMappingEnum);
     qc::MapperParameters mapperParameters;
@@ -102,11 +102,21 @@ int main(int argc, char* argv[]) {
                           std::filesystem::path(qasmFile).filename().string() +
                           "_" + std::to_string(runIdx) + ".qasm_aod");
     qcAodMapped.dumpOpenQASM(ofs_aod);
-    auto endTime = std::chrono::high_resolution_clock::now();
-    auto timeTaken = std::chrono::duration_cast<std::chrono::milliseconds>(endTime - startTime).count();
+    auto endTime   = std::chrono::high_resolution_clock::now();
+    auto timeTaken = std::chrono::duration_cast<std::chrono::milliseconds>(
+                         endTime - startTime)
+                         .count();
     // do the scheduling
     qc::NeutralAtomScheduler scheduler = qc::NeutralAtomScheduler(arch);
-    auto schedulerResults = scheduler.schedule(qcAodMapped, verbose);
+    bool                     createAnimationCsv   = true;
+    qc::fp                   shuttlingSpeedFactor = 0.1;
+    auto                     schedulerResults =
+        scheduler.schedule(qcAodMapped, mapper.getInitHwPos(), verbose,
+                           createAnimationCsv, shuttlingSpeedFactor);
+    scheduler.saveAnimationCsv(
+        output_directory + "/" +
+        std::filesystem::path(qasmFile).filename().string() + "_" +
+        std::to_string(runIdx) + "_animate.csv");
 
     // dump the results
     ofsResults << std::filesystem::path(qasmFile).filename().string() + ", " +
