@@ -17,7 +17,7 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
 
   std::vector<fp> totalExecutionTimes(arch.getNpositions(), 0);
   // saves for each coord the time slots that are blocked by a multi qubit gate
-  std::vector<std::deque<std::pair<fp, fp>>> blockedQubitsTimes(
+  std::vector<std::deque<std::pair<fp, fp>>> rydbergBlockedQubitsTimes(
       arch.getNpositions(), std::deque<std::pair<fp, fp>>());
   fp totalGateTime       = 0;
   fp totalGateFidelities = 1;
@@ -64,24 +64,24 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
     if (op->getType() != qc::AodMove && op->getType() != qc::AodActivate &&
         op->getType() != qc::AodDeactivate && qubits.size() > 1) {
       // multi qubit gates -> take into consideration blocking
-      auto blockedQubits = arch.getBlockedCoordIndices(op.get());
+      auto rydbergBlockedQubits = arch.getBlockedCoordIndices(op.get());
       // get max execution time over all blocked qubits
-      bool blocked = true;
-      while (blocked) {
+      bool rydbergBlocked = true;
+      while (rydbergBlocked) {
         // get regular max execution time
         for (const auto& qubit : qubits) {
           maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
         }
         // check if all blocked qubits are free at maxTime
-        blocked = false;
-        for (const auto& qubit : blockedQubits) {
+        rydbergBlocked = false;
+        for (const auto& qubit : rydbergBlockedQubits) {
           // check if qubit is blocked at maxTime
-          for (const auto& startEnd : blockedQubitsTimes[qubit]) {
+          for (const auto& startEnd : rydbergBlockedQubitsTimes[qubit]) {
             auto start = startEnd.first;
             auto end   = startEnd.second;
             if (start <= maxTime && end > maxTime ||
                 (start <= maxTime + opTime && end > maxTime + opTime)) {
-              blocked = true;
+              rydbergBlocked = true;
               // update maxTime to the end of the blocking
               maxTime = end;
               // remove the blocking
@@ -99,8 +99,9 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
       for (const auto& qubit : qubits) {
         totalExecutionTimes[qubit] = maxTime + opTime;
       }
-      for (const auto& qubit : blockedQubits) {
-        blockedQubitsTimes[qubit].emplace_back(maxTime, maxTime + opTime);
+      for (const auto& qubit : rydbergBlockedQubits) {
+        rydbergBlockedQubitsTimes[qubit].emplace_back(maxTime,
+                                                      maxTime + opTime);
       }
 
     } else {
@@ -109,9 +110,9 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
       for (const auto& qubit : qubits) {
         maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
         // remove all blocked times that are smaller than maxTime
-        while (!blockedQubitsTimes[qubit].empty() &&
-               blockedQubitsTimes[qubit].front().second < maxTime) {
-          blockedQubitsTimes[qubit].pop_front();
+        while (!rydbergBlockedQubitsTimes[qubit].empty() &&
+               rydbergBlockedQubitsTimes[qubit].front().second < maxTime) {
+          rydbergBlockedQubitsTimes[qubit].pop_front();
         }
       }
       // update total execution times
@@ -124,7 +125,7 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
     totalGateTime += opTime;
     if (verbose) {
       std::cout << "\n";
-      printTotalExecutionTimes(totalExecutionTimes, blockedQubitsTimes);
+      printTotalExecutionTimes(totalExecutionTimes, rydbergBlockedQubitsTimes);
     }
 
     // update animation
