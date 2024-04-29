@@ -19,6 +19,7 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
   // saves for each coord the time slots that are blocked by a multi qubit gate
   std::vector<std::deque<std::pair<fp, fp>>> rydbergBlockedQubitsTimes(
       arch.getNpositions(), std::deque<std::pair<fp, fp>>());
+  fp aodLastBlockedTime  = 0;
   fp totalGateTime       = 0;
   fp totalGateFidelities = 1;
 
@@ -61,8 +62,15 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
     }
 
     fp maxTime = 0;
-    if (op->getType() != qc::AodMove && op->getType() != qc::AodActivate &&
-        op->getType() != qc::AodDeactivate && qubits.size() > 1) {
+    if (op->getType() == qc::AodMove || op->getType() == qc::AodActivate ||
+        op->getType() == qc::AodDeactivate) {
+      // AodBlocking
+      maxTime = aodLastBlockedTime;
+      for (const auto& qubit : qubits) {
+        maxTime = std::max(maxTime, totalExecutionTimes[qubit]);
+      }
+      aodLastBlockedTime = maxTime + opTime;
+    } else if (qubits.size() > 1) {
       // multi qubit gates -> take into consideration blocking
       auto rydbergBlockedQubits = arch.getBlockedCoordIndices(op.get());
       // get max execution time over all blocked qubits
@@ -95,10 +103,6 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
         }
       }
 
-      // update total execution times
-      for (const auto& qubit : qubits) {
-        totalExecutionTimes[qubit] = maxTime + opTime;
-      }
       for (const auto& qubit : rydbergBlockedQubits) {
         rydbergBlockedQubitsTimes[qubit].emplace_back(maxTime,
                                                       maxTime + opTime);
@@ -115,10 +119,10 @@ qc::SchedulerResults qc::NeutralAtomScheduler::schedule(
           rydbergBlockedQubitsTimes[qubit].pop_front();
         }
       }
-      // update total execution times
-      for (const auto& qubit : qubits) {
-        totalExecutionTimes[qubit] = maxTime + opTime;
-      }
+    }
+    // update total execution times
+    for (const auto& qubit : qubits) {
+      totalExecutionTimes[qubit] = maxTime + opTime;
     }
 
     totalGateFidelities *= opFidelity;
