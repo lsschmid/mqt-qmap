@@ -269,7 +269,14 @@ qc::AnimationAtoms::createCsvOp(const std::unique_ptr<qc::Operation>& op,
               std::abs(coord.second - coordIdx / arch.getNcolumns() *
                                           arch.getInterQubitDistance()) <
                   0.0001) {
-            coordIdxToId.erase(coordIdxToId.find(id));
+            // remove old coordIdx with same id
+            for (const auto& [oldCoordIdx, oldId] : coordIdxToId) {
+              if (oldId == id) {
+                coordIdxToId.erase(oldCoordIdx);
+                break;
+              }
+            }
+            // add new coordIdx with id
             coordIdxToId[coordIdx] = id;
             break;
           }
