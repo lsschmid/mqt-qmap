@@ -330,10 +330,11 @@ qc::AnimationAtoms::createCsvOp(const std::unique_ptr<qc::Operation>& op,
       csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
                                ColorSlm, false, 0, false, marginIds.at(id));
       auto midTime = (startTime + endTime) / 2;
-      csvLine += createCsvLine(midTime, id, coord.first, coord.second, 1,
-                               ColorCz, false, 0, true, marginIds.at(id),
-                               arch.getBlockingFactor() *
-                                   arch.getInterQubitDistance());
+      csvLine +=
+          createCsvLine(midTime, id, coord.first, coord.second, 1, ColorCz,
+                        false, 0, true, marginIds.at(id),
+                        arch.getBlockingFactor() * arch.getInteractionRadius() *
+                            arch.getInterQubitDistance());
       csvLine += createCsvLine(endTime, id, coord.first, coord.second, 1,
                                ColorSlm, false, 0, false, marginIds.at(id));
       removeMargin(id);
