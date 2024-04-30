@@ -137,11 +137,15 @@ protected:
     addActivation(std::pair<ActivationMergeType, ActivationMergeType> merge,
                   const Coordinate& origin, const AtomMove& move, MoveVector v);
     /**
-     * @brief Adds an activation to the current activations
+     * @brief Merges the given activation into the current activations
      * @param dim The dimension/direction of the activation
-     * @param activation The activation to add
+     * @param activationDim The activation to merge in the given
+     * dimension/direction
+     * @param activationOtherDim The activation to merge/add in the other
+     * dimension/direction
      */
-    void addActivationDim(Dimension dim, const AodActivation& activation);
+    void mergeActivationDim(Dimension dim, const AodActivation& activationDim,
+                            const AodActivation& activationOtherDim);
     /**
      * @brief Orders the aod offset moves such that they will not cross each
      * other
@@ -207,7 +211,6 @@ protected:
     std::vector<AodOperation>                  processedOpsInit;
     std::vector<AodOperation>                  processedOpsFinal;
     AodOperation                               processedOpShuttle;
-    std::vector<CoordIndex>                    targetQubits;
     std::vector<CoordIndex>                    qubitsUsedByGates;
 
     // Constructor

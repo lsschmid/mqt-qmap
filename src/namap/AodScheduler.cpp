@@ -56,9 +56,9 @@ void AodScheduler::initMoveGroups(QuantumComputation& qc) {
       }
     } else if (op->getNqubits() > 1 && !currentMoveGroup.moves.empty()) {
       for (const auto& qubit : op->getUsedQubits()) {
-        if (std::find(currentMoveGroup.targetQubits.begin(),
-                      currentMoveGroup.targetQubits.end(),
-                      qubit) == currentMoveGroup.targetQubits.end()) {
+        if (std::find(currentMoveGroup.qubitsUsedByGates.begin(),
+                      currentMoveGroup.qubitsUsedByGates.end(),
+                      qubit) == currentMoveGroup.qubitsUsedByGates.end()) {
           currentMoveGroup.qubitsUsedByGates.push_back(qubit);
         }
       }
@@ -106,7 +106,7 @@ bool AodScheduler::MoveGroup::parallelCheck(const MoveVector& v1,
 
 void AodScheduler::MoveGroup::add(const AtomMove& move, const uint32_t idx) {
   moves.emplace_back(move, idx);
-  targetQubits.push_back(move.second);
+  qubitsUsedByGates.push_back(move.second);
 }
 
 void AodScheduler::AodActivationHelper::addActivation(
@@ -129,10 +129,9 @@ void AodScheduler::AodActivationHelper::addActivation(
           AodActivation{{x, deltaX, signX}, {y, deltaY, signY}, move});
       break;
     case ActivationMergeType::Merge:
-      allActivations.emplace_back(
-          AodActivation{Dimension::X, {x, deltaX, signX}, move});
-      addActivationDim(Dimension::Y,
-                       AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      mergeActivationDim(Dimension::Y,
+                         AodActivation{Dimension::Y, {y, deltaY, signY}, move},
+                         AodActivation{Dimension::X, {x, deltaX, signX}, move});
       break;
     case ActivationMergeType::Append:
       allActivations.emplace_back(
@@ -147,22 +146,18 @@ void AodScheduler::AodActivationHelper::addActivation(
   case ActivationMergeType::Merge:
     switch (merge.second) {
     case ActivationMergeType::Trivial:
-      allActivations.emplace_back(
-          AodActivation{Dimension::Y, {y, deltaY, signY}, move});
-      addActivationDim(Dimension::X,
-                       AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      mergeActivationDim(Dimension::X,
+                         AodActivation{Dimension::X, {x, deltaX, signX}, move},
+                         AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       break;
     case ActivationMergeType::Merge:
-      addActivationDim(Dimension::X,
-                       AodActivation{Dimension::X, {x, deltaX, signX}, move});
-      addActivationDim(Dimension::Y,
-                       AodActivation{Dimension::Y, {y, deltaY, signY}, move});
-      break;
+      throw QMAPException("Merge in both dimensions should never happen.");
     case ActivationMergeType::Append:
-      addActivationDim(Dimension::X,
-                       AodActivation{Dimension::X, {x, deltaX, signX}, move});
-      allActivations.emplace_back(
-          AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      mergeActivationDim(Dimension::X,
+                         AodActivation{Dimension::X, {x, deltaX, signX}, move},
+                         AodActivation{Dimension::Y, {y, deltaY, signY}, move});
+      //      allActivations.emplace_back(
+      //          AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       aodMovesY = getAodMovesFromInit(Dimension::Y, y);
       reAssignOffsets(aodMovesY, signY);
       break;
@@ -179,12 +174,13 @@ void AodScheduler::AodActivationHelper::addActivation(
       reAssignOffsets(aodMovesX, signX);
       break;
     case ActivationMergeType::Merge:
-      allActivations.emplace_back(
-          AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      //      allActivations.emplace_back(
+      //          AodActivation{Dimension::X, {x, deltaX, signX}, move});
+      mergeActivationDim(Dimension::Y,
+                         AodActivation{Dimension::Y, {y, deltaY, signY}, move},
+                         AodActivation{Dimension::X, {x, deltaX, signX}, move});
       aodMovesX = getAodMovesFromInit(Dimension::X, x);
       reAssignOffsets(aodMovesX, signX);
-      addActivationDim(Dimension::Y,
-                       AodActivation{Dimension::Y, {y, deltaY, signY}, move});
       break;
     case ActivationMergeType::Append:
       allActivations.emplace_back(
@@ -258,8 +254,10 @@ void AodScheduler::AodActivationHelper::reAssignOffsets(
 
 void AodScheduler::processMoveGroups() {
   // convert the moves from MoveGroup to AodOperations
+  int i = 0;
   for (auto groupIt = moveGroups.begin(); groupIt != moveGroups.end();
        ++groupIt) {
+    i++;
     AodActivationHelper   aodActivationHelper{arch, OpType::AodActivate};
     AodActivationHelper   aodDeactivationHelper{arch, OpType::AodDeactivate};
     MoveGroup             possibleNewMoveGroup{arch};
@@ -419,16 +417,26 @@ bool AodScheduler::AodActivationHelper::checkIntermediateSpaceAtInit(
          arch.getNAodIntermediateLevels();
 }
 
-void AodScheduler::AodActivationHelper::addActivationDim(
-    Dimension dim, const AodActivation& activation) {
+void AodScheduler::AodActivationHelper::mergeActivationDim(
+    Dimension dim, const AodActivation& activationDim,
+    const AodActivation& activationOtherDim) {
   // merge activations
   for (auto& activationCurrent : allActivations) {
-    auto activates = activation.getActivates(dim);
+    auto activates = activationDim.getActivates(dim);
     for (auto* aodMove : activates) {
-      if (aodMove->init == activation.getActivates(dim)[0]->init &&
-          aodMove->delta == activation.getActivates(dim)[0]->delta &&
-          aodMove->offset == activation.getActivates(dim)[0]->offset) {
-        activationCurrent.moves.push_back(activation.moves[0]);
+      if (aodMove->init == activationDim.getActivates(dim)[0]->init &&
+          aodMove->delta == activationDim.getActivates(dim)[0]->delta &&
+          aodMove->offset == activationDim.getActivates(dim)[0]->offset) {
+        // append move
+        activationCurrent.moves.push_back(activationDim.moves[0]);
+        // add activation in the other dimension
+        if (dim == Dimension::X) {
+          activationCurrent.activateYs.push_back(
+              activationOtherDim.activateYs[0]);
+        } else {
+          activationCurrent.activateXs.push_back(
+              activationOtherDim.activateXs[0]);
+        }
         return;
       }
     }
