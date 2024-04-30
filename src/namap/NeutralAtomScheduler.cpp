@@ -306,6 +306,11 @@ qc::AnimationAtoms::createCsvOp(const std::unique_ptr<qc::Operation>& op,
       removeAxis(id);
 
     } else if (op->getType() == OpType::AodMove) {
+      if (axesIds.find(id) == axesIds.end()) {
+        throw QMAPException(
+            "Tried to move qubit at coordIdx " + std::to_string(coordIdx) +
+            " but there is no axis for qubit " + std::to_string(id));
+      }
       csvLine += createCsvLine(startTime, id, coord.first, coord.second, 1,
                                ColorAod, true, axesIds.at(id));
 
