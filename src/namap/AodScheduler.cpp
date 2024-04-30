@@ -335,17 +335,21 @@ AodOperation AodScheduler::MoveGroup::connectAodOperations(
             const auto startYs = opInit.getEnds(Dimension::Y);
             const auto endYs   = opFinal.getStarts(Dimension::Y);
             if (!startXs.empty() && !endXs.empty()) {
-              const auto startX = startXs[0];
-              const auto endX   = endXs[0];
-              if (startX != endX) {
-                aodOperations.emplace_back(Dimension::X, startX, endX);
+              for (size_t i = 0; i < startXs.size(); i++) {
+                const auto startX = startXs[i];
+                const auto endX   = endXs[i];
+                if (startX != endX) {
+                  aodOperations.emplace_back(Dimension::X, startX, endX);
+                }
               }
             }
             if (!startYs.empty() && !endYs.empty()) {
-              const auto startY = startYs[0];
-              const auto endY   = endYs[0];
-              if (startY != endY) {
-                aodOperations.emplace_back(Dimension::Y, startY, endY);
+              for (size_t i = 0; i < startYs.size(); i++) {
+                const auto startY = startYs[i];
+                const auto endY   = endYs[i];
+                if (startY != endY) {
+                  aodOperations.emplace_back(Dimension::Y, startY, endY);
+                }
               }
             }
           }
